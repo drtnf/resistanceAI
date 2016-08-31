@@ -44,7 +44,6 @@ public class Game{
   private void init(){
     players = new HashMap<Character,Agent>();
     spies = new HashSet<Character>();
-    resistance = new HashSet<Character>();
     rand = new Random();
     long seed = rand.nextLong();
     rand.setSeed(seed);
@@ -101,6 +100,13 @@ public class Game{
     }
   }
 
+
+  /**
+   * Sends a status update to all players.
+   * The status includes the players name, the player string, the spys (or a string of ? if the player is not a spy, the number of rounds played and the number of rounds failed)
+   * @param round the current round
+   * @param fails the number of rounds failed
+   **/
   private void statusUpdate(int round, int fails){
     for(Character c in players.keys()){
       if(spies.contains(c)) 
@@ -110,29 +116,78 @@ public class Game{
     }
   }
 
-  public String nominate(int round){
+  /**
+   * This method picks a random leader for the next round and has them nominate a mission team.
+   * If the leader does not pick a legitimate mission team (wrong number of agents, or agents that are not in the game) a default selection is given instead.
+   * @param round the round in the game the mission is for.
+   * @return a String containing the names of the agents being sent on the mission
+   * */
+  private String nominate(int round){
     Character leader = (char)(rand.nextInt(numPlayers)+65);
     mNum = missionNum[numPlayers-5][round];
     String team = players.get(leader).do_Nominate(mNum);
-    
-    for(char c in team.toArray()){
-      
-
-
+    Character[] tA = team.toArray().sort();
+    boolean legit = tA.length==mNum;
+    for(int i = 0; i<mNum; i++){
+      if(!players.contains(tA[i]) legit = false;
+      if(i>0 && tA[i].equals(tA[i-1])) legit=false;
+    }
+    if(!legit){
+      team = "";
+      for(int i = 0; i< mNum; i++) team+=(char)(65+i);
+    }
+    for(Character c in players.keys())
+      players.get(c).tell_ProposedMission(leader+"", team);
+    return team;
   }
 
-  public boolean vote(String team){
-
+  /**
+   * This method requests votes from all players on the most recently proposed mission teams, and reports whether a majority voted yes.
+   * It counts the votes and reports a String of all agents who voted in favour to the each agent.
+   * @return true if a strict majority supported the mission.
+   * */
+  private boolean vote(){
+   int votes = 0;
+   String yays = "";
+   for(Character c in players.keys()){
+      if(players.get(c).do_vote()){
+        votes++;
+        yays+=c;
+       }
+    }
+    for(Character c in players.keys())
+      players.get(c).tell_Votes(yays);
+    return (votes>numPlayers/2);  
   }
 
+  /**
+   * Polls the mission team on whetehr they betray or not, and reports the result.
+   * First it informs all players of the team being sent on the mission. 
+   * Then polls each agent who goes on the mission on whether or not they betray the mission.
+   * It reports to each agent the number of betrayals.
+   * @param team A string with one character for each member of the team.
+   * @return the number of agents who betray the mission.
+   * */
   public int mission(String team){
-
+    for(Character c in players.keys())
+      players.get(c).tell_mission(team);
+    int traitorss = 0;
+    for(Character c in team.toArray()){
+      if(players.get(c).do_Betrayal()) traitors++;
+    }
+    for(Character c in players.keys())
+      players.get(c).tell_Traitors(traitors);
+    return traitors;  
   }
 
+  /**
+   * Conducts the game play, consisting of 5 rounds, each with a series of nominations and votes, and the eventual mission.
+   * It logs the result of the game at the end.
+   * */
   public void play(){
     int fails = 0;
     for(int round = 1; round<=5; round++){
-      Set<Character>  team = nominate(round);
+      String team = nominate(round);
       voteRnd = 0
       while(voteRnd++<5 && !vote())
         team = nominate(rnd);
