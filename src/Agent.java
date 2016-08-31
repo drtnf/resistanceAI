@@ -3,7 +3,7 @@
  * Each agent is given a single capital letter, which will be their name for the game.
  * The game actions will be encoded using strings.
  * The agent will be created entirely in a single game, and the agent must maintain its own state.
- * Methods will be used for informing agents of game events (tell_ methods, must return in 100ms) or requiring actions (do_ methods, must return in 1000ms).
+ * Methods will be used for informing agents of game events (get_ methods, must return in 100ms) or requiring actions (do_ methods, must return in 1000ms).
  * If actions do not meet the required specification, a nominated default action will be recorded.
  * @author Tim French
  * **/
@@ -19,7 +19,7 @@ public interface Agent{
    * @param mission the next mission to be launched
    * @param failures the number of failed missions
    * */
-  public void tell_status(String name, String players, String spies, int mission, int failures);
+  public void get_status(String name, String players, String spies, int mission, int failures);
   
   /**
    * Nominates a group of agents to go on a mission.
@@ -35,7 +35,7 @@ public interface Agent{
    * @param leader the leader who proposed the mission
    * @param mission a String containing the names of all the agents in the mission 
    **/
-  public void tell_ProposedMission(String leader, String mission);
+  public void get_ProposedMission(String leader, String mission);
 
   /**
    * Gets an agents vote on the last reported mission
@@ -47,14 +47,14 @@ public interface Agent{
    * Reports the votes for the previous mission
    * @param yays the names of the agents who voted for the mission
    **/
-  public void tell_Votes(Strings yays); 
+  public void get_Votes(String yays); 
 
   /**
    * Reports the agents being sent on a mission.
    * Should be able to be infered from tell_ProposedMission and tell_Votes, but incldued for completeness.
    * @param mission the Agents being sent on a mission
    **/
-  public void tell_Mission(String mission);
+  public void get_Mission(String mission);
 
   /**
    * Agent chooses to betray or not.
@@ -66,7 +66,23 @@ public interface Agent{
    * Reports the number of people who betrayed the mission
    * @param traitors the number of people on the mission who chose to betray (0 for success, greater than 0 for failure)
    **/
-  public void tell_Traitors(int traitors);
+  public void get_Traitors(int traitors);
 
+
+  /**
+   * Optional method to accuse other Agents of being spies. 
+   * Default action should return the empty String. 
+   * Convention suggests that this method only return a non-empty string when the accuser is sure that the accused is a spy.
+   * Of course convention can be ignored.
+   * @return a string containing the name of each accused agent. 
+   * */
+  public String do_Accuse();
+
+  /**
+   * Optional method to process an accusation.
+   * @param accuser the name of the agent making the accusation.
+   * @param accused the names of the Agents being Accused, concatenated in a String.
+   * */
+  public void get_Accusation(String accuser, String accused);
 
 }

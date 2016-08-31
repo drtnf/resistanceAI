@@ -13,8 +13,8 @@ public class Game{
   private String spyString = "";
   private String resString = "";
   private int numPlayers = 0;
-  private static final int[] spyNum = {2,2,3,3,3,4} //spyNum[n-5] is the number of spies in an n player game
-  private static final int[][] missionNum = {{2,3,2,3,3},{2,3,4,3,4},{2,3,3,4,4},{3,4,4,5,5},{3,4,4,5,5},{3,4,4,5,5}} 
+  private static final int[] spyNum = {2,2,3,3,3,4}; //spyNum[n-5] is the number of spies in an n player game
+  private static final int[][] missionNum = {{2,3,2,3,3},{2,3,4,3,4},{2,3,3,4,4},{3,4,4,5,5},{3,4,4,5,5},{3,4,4,5,5}};
                                     //missionNum[n-5][i] is the number to send on mission i in a  in an n player game
   private Random rand;
   private File logFile;
@@ -35,8 +35,8 @@ public class Game{
    * Creates an empty game
    * @param logFile path to the log file
    * */
-  public Game(String logFile){
-    logFile = new File(logFile);
+  public Game(String fName){
+    logFile = new File(fName);
     logging = true;
     init();
   }
@@ -47,7 +47,7 @@ public class Game{
     rand = new Random();
     long seed = rand.nextLong();
     rand.setSeed(seed);
-    log("\n"+LocalDateTime.now()+"\nSeed: "+seed);
+    log("Seed: "+seed);
   }
 
   private void log(String msg){
@@ -55,7 +55,7 @@ public class Game{
       try{
         FileWriter log = new FileWriter(logFile);
         log.write(msg);
-        FileWriter.close();
+        log.close();
       }catch(IOException e){e.printStackTrace();}
     }
     else{
@@ -72,7 +72,7 @@ public class Game{
     if(numPlayers > 9) throw new RuntimeException("Too many players");
     else if(started) throw new RuntimeException("Game already underway");
     else{
-      String name = ""+((char)(65+numPlayers++));
+      Character name = (char)(65+numPlayers++);
       players.put(name, a);
       log("Player "+name+" added.");
     }
@@ -86,15 +86,15 @@ public class Game{
     if(numPlayers < 5) throw new RuntimeException("Too few players");
     else if(started) throw new RuntimeException("Game already underway");
     else{
-      for(i = 0; i<spyNum[numPlayers-5]; i++){
+      for(int i = 0; i<spyNum[numPlayers-5]; i++){
         char spy = ' ';
         while(spy==' ' || spies.contains(spy)){
           spy = (char)(65+rand.nextInt(numPlayers));
         }
         spies.add(spy);
       }
-      for(Character c in players.keys())playerString+=c;
-      for(Character c in players.spies()){spyString+=c; resString+='?';}
+      for(Character c: players.keySet())playerString+=c;
+      for(Character c: spies){spyString+=c; resString+='?';}
       statusUpdate(0,0);
       started= true;
     }
@@ -108,11 +108,11 @@ public class Game{
    * @param fails the number of rounds failed
    **/
   private void statusUpdate(int round, int fails){
-    for(Character c in players.keys()){
+    for(Character c: players.keySet()){
       if(spies.contains(c)) 
-        players.get(c).tell_status(""+c,playerString,spyString,round,fails);
+        players.get(c).get_status(""+c,playerString,spyString,round,fails);
       else 
-        players.get(c).tell_status(""+c,playerString,resString,round,fails);
+        players.get(c).get_status(""+c,playerString,resString,round,fails);
     }
   }
 
@@ -124,20 +124,21 @@ public class Game{
    * */
   private String nominate(int round){
     Character leader = (char)(rand.nextInt(numPlayers)+65);
-    mNum = missionNum[numPlayers-5][round];
+    int mNum = missionNum[numPlayers-5][round];
     String team = players.get(leader).do_Nominate(mNum);
-    Character[] tA = team.toArray().sort();
+    char[] tA = team.toCharArray();
+    Arrays.sort(tA);
     boolean legit = tA.length==mNum;
     for(int i = 0; i<mNum; i++){
-      if(!players.contains(tA[i]) legit = false;
-      if(i>0 && tA[i].equals(tA[i-1])) legit=false;
+      if(!players.keySet().contains(tA[i])) legit = false;
+      if(i>0 && tA[i]==tA[i-1]) legit=false;
     }
     if(!legit){
       team = "";
       for(int i = 0; i< mNum; i++) team+=(char)(65+i);
     }
-    for(Character c in players.keys())
-      players.get(c).tell_ProposedMission(leader+"", team);
+    for(Character c: players.keySet())
+      players.get(c).get_ProposedMission(leader+"", team);
     return team;
   }
 
@@ -149,14 +150,14 @@ public class Game{
   private boolean vote(){
    int votes = 0;
    String yays = "";
-   for(Character c in players.keys()){
-      if(players.get(c).do_vote()){
+   for(Character c: players.keySet()){
+      if(players.get(c).do_Vote()){
         votes++;
         yays+=c;
        }
     }
-    for(Character c in players.keys())
-      players.get(c).tell_Votes(yays);
+    for(Character c: players.keySet())
+      players.get(c).get_Votes(yays);
     return (votes>numPlayers/2);  
   }
 
@@ -169,14 +170,14 @@ public class Game{
    * @return the number of agents who betray the mission.
    * */
   public int mission(String team){
-    for(Character c in players.keys())
-      players.get(c).tell_mission(team);
-    int traitorss = 0;
-    for(Character c in team.toArray()){
-      if(players.get(c).do_Betrayal()) traitors++;
+    for(Character c: players.keySet())
+      players.get(c).get_Mission(team);
+    int traitors = 0;
+    for(Character c: team.toCharArray()){
+      if(players.get(c).do_Betray()) traitors++;
     }
-    for(Character c in players.keys())
-      players.get(c).tell_Traitors(traitors);
+    for(Character c: players.keySet())
+      players.get(c).get_Traitors(traitors);
     return traitors;  
   }
 
@@ -188,13 +189,19 @@ public class Game{
     int fails = 0;
     for(int round = 1; round<=5; round++){
       String team = nominate(round);
-      voteRnd = 0
+      int voteRnd = 0;
       while(voteRnd++<5 && !vote())
-        team = nominate(rnd);
+        team = nominate(round);
       int traitors = mission(team);
-      if(traitors !=0 && (traitors !=1 || round !=4 || numplayers<7))
+      if(traitors !=0 && (traitors !=1 || round !=4 || numPlayers<7))
         fails++;
-      statusUpdate(int round, int fails);
+      statusUpdate(round, fails);
+      HashMap<Character,String> accusations = new HashMap<Character, String>();
+      for(Character c: players.keySet())
+        accusations.put(c,players.get(c).do_Accuse());
+      for(Character c: players.keySet())
+        for(Character a: accusations.keySet())
+          players.get(c).get_Accusation(a+"", accusations.get(a));
     }
     if(fails>2) log("Government Wins! "+fails+" missions failed.");
     else log("Resistance Wins! "+fails+" missions failed.");
