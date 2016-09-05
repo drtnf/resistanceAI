@@ -97,6 +97,7 @@ public class Game{
       for(Character c: spies){spyString+=c; resString+='?';}
       statusUpdate(0,0);
       started= true;
+      log("Game set up. Spys allocated");
     }
   }
 
@@ -139,6 +140,7 @@ public class Game{
     }
     for(Character c: players.keySet())
       players.get(c).get_ProposedMission(leader+"", team);
+    log(leader+" nominated "+team);
     return team;
   }
 
@@ -158,11 +160,12 @@ public class Game{
     }
     for(Character c: players.keySet())
       players.get(c).get_Votes(yays);
+    log(votes+" votes for: "+yays);
     return (votes>numPlayers/2);  
   }
 
   /**
-   * Polls the mission team on whetehr they betray or not, and reports the result.
+   * Polls the mission team on whether they betray or not, and reports the result.
    * First it informs all players of the team being sent on the mission. 
    * Then polls each agent who goes on the mission on whether or not they betray the mission.
    * It reports to each agent the number of betrayals.
@@ -178,6 +181,7 @@ public class Game{
     }
     for(Character c: players.keySet())
       players.get(c).get_Traitors(traitors);
+    log(traitors +" betrayed the mission");
     return traitors;  
   }
 
@@ -192,22 +196,47 @@ public class Game{
       int voteRnd = 0;
       while(voteRnd++<5 && !vote())
         team = nominate(round);
+      log(team+" elected");
       int traitors = mission(team);
-      if(traitors !=0 && (traitors !=1 || round !=4 || numPlayers<7))
+      if(traitors !=0 && (traitors !=1 || round !=4 || numPlayers<7)){
         fails++;
+        log("Mission failed");
+      }
+      else log("Mission succeeded");
       statusUpdate(round, fails);
       HashMap<Character,String> accusations = new HashMap<Character, String>();
       for(Character c: players.keySet())
         accusations.put(c,players.get(c).do_Accuse());
-      for(Character c: players.keySet())
-        for(Character a: accusations.keySet())
-          players.get(c).get_Accusation(a+"", accusations.get(a));
+      for(Character c: players.keySet()){
+        log(c+" accuses "+accusations.get(c));
+        for(Character a: players.keySet())
+          players.get(a).get_Accusation(c+"", accusations.get(c));
+      }  
     }
     if(fails>2) log("Government Wins! "+fails+" missions failed.");
     else log("Resistance Wins! "+fails+" missions failed.");
     log("The Government Spies were "+spyString+".");
   }
 
+
+  /**
+   * Sets up game with random agents and plays
+   **/
+  public static void main(String[] args){
+    Game g = new Game();
+    g.addPlayer(new RandomAgent());
+    g.addPlayer(new RandomAgent());
+    g.addPlayer(new RandomAgent());
+    g.addPlayer(new RandomAgent());
+    g.addPlayer(new RandomAgent());
+    g.addPlayer(new RandomAgent());
+    g.addPlayer(new RandomAgent());
+    g.addPlayer(new RandomAgent());
+    g.addPlayer(new RandomAgent());
+    g.addPlayer(new RandomAgent());
+    g.setup();
+    g.play();
+  }
 }  
         
         
