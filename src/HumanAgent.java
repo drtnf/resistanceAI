@@ -12,12 +12,13 @@ import java.io.*;
  * **/
 
 
-public class HumanAgent{
+public class HumanAgent implements Agent{
 
   private Scanner scanner;
   private String players = "";
   private String spies = "";
   private String name;
+  private boolean spy = false;
   private PrintStream out;
 
   public HumanAgent(){
@@ -46,10 +47,11 @@ public class HumanAgent{
     this.name = name;
     this.players = players;
     this.spies = spies;
+    if(spies.indexOf(name)!=-1) spy = true;
     write("You are: "+name); 
     write("The players in the game are: "+players); 
     write("The Spies are: "+spies); 
-    write("It is mission: "+mission);
+    write("The next mission is: "+mission);
     write("So far, "+failures+" missions have failed");
   }
   
@@ -61,7 +63,7 @@ public class HumanAgent{
    * @return a String containing the names of all the agents in a mission
    * */
   public String do_Nominate(int number){
-    write("Please nominate a mission");
+    write("Please nominate a mission with "+number+" members.");
     return getInput();
   }
 
@@ -109,6 +111,7 @@ public class HumanAgent{
    * @return true if agent betrays, false otherwise
    **/
   public boolean do_Betray(){
+    if(!spy){write("You are on the mission"); return false;}
     String in = "";
     while(!in.equals("Y")&&!in.equals("N")){
         write("You are on the mission. Do you betray the mission? [Y/N]:");

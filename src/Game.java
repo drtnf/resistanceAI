@@ -95,7 +95,7 @@ public class Game{
       }
       for(Character c: players.keySet())playerString+=c;
       for(Character c: spies){spyString+=c; resString+='?';}
-      statusUpdate(0,0);
+      statusUpdate(1,0);
       started= true;
       log("Game set up. Spys allocated");
     }
@@ -125,12 +125,12 @@ public class Game{
    * */
   private String nominate(int round){
     Character leader = (char)(rand.nextInt(numPlayers)+65);
-    int mNum = missionNum[numPlayers-5][round];
+    int mNum = missionNum[numPlayers-5][round-1];
     String team = players.get(leader).do_Nominate(mNum);
     char[] tA = team.toCharArray();
     Arrays.sort(tA);
     boolean legit = tA.length==mNum;
-    for(int i = 0; i<mNum; i++){
+    for(int i = 0; i<mNum && legit; i++){
       if(!players.keySet().contains(tA[i])) legit = false;
       if(i>0 && tA[i]==tA[i-1]) legit=false;
     }
@@ -203,7 +203,7 @@ public class Game{
         log("Mission failed");
       }
       else log("Mission succeeded");
-      statusUpdate(round, fails);
+      statusUpdate(round+1, fails);
       HashMap<Character,String> accusations = new HashMap<Character, String>();
       for(Character c: players.keySet())
         accusations.put(c,players.get(c).do_Accuse());
@@ -233,7 +233,7 @@ public class Game{
     g.addPlayer(new RandomAgent());
     g.addPlayer(new RandomAgent());
     g.addPlayer(new RandomAgent());
-    g.addPlayer(new RandomAgent());
+    g.addPlayer(new HumanAgent());
     g.setup();
     g.play();
   }
