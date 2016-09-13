@@ -177,6 +177,7 @@ public class Game{
       players.get(c).get_Mission(team);
     int traitors = 0;
     for(Character c: team.toCharArray()){
+      //check for spies here.
       if(players.get(c).do_Betray()) traitors++;
     }
     for(Character c: players.keySet())
