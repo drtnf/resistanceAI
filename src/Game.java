@@ -20,7 +20,7 @@ public class Game{
   private File logFile;
   private boolean logging = false;
   private boolean started = false;
-
+  private long stopwatch = 0;
 
 
   /**
@@ -41,6 +41,9 @@ public class Game{
     init();
   }
 
+  /**
+   * Initializes the data structures for the game
+   * */
   private void init(){
     players = new HashMap<Character,Agent>();
     spies = new HashSet<Character>();
@@ -50,6 +53,10 @@ public class Game{
     log("Seed: "+seed);
   }
 
+  /**
+   * Writes the String to the log file
+   * @param msg the String to log
+   * */
   private void log(String msg){
     if(logging){
       try{
@@ -101,6 +108,23 @@ public class Game{
     }
   }
 
+  /** 
+   * Starts a timer for Agent method calls
+   * */
+  private void stopwatchOn(){
+    stopwatch = System.currentTimeMillis();
+  }
+
+  /**
+   * Checks how if timelimit exceed and if so, logs a violation against a player.
+   * @param limit the limit since stopwatch start, in milliseconds
+   * @param player the player who the violation will be recorded against.
+   * */
+  private void stopwatchOff(long limit, Character player){
+    long delay = System.currentTimeMillis()-stopwatch;
+    if(delay>limit)
+      log("Player: "+player+". Time exceeded by "+delay);
+  }
 
   /**
    * Sends a status update to all players.
@@ -110,10 +134,12 @@ public class Game{
    **/
   private void statusUpdate(int round, int fails){
     for(Character c: players.keySet()){
-      if(spies.contains(c)) 
-        players.get(c).get_status(""+c,playerString,spyString,round,fails);
-      else 
-        players.get(c).get_status(""+c,playerString,resString,round,fails);
+      if(spies.contains(c)){
+        stopwatchOn(); players.get(c).get_status(""+c,playerString,spyString,round,fails); stopwatchOff(100,c);
+      }
+      else{ 
+        stopwatchOn(); players.get(c).get_status(""+c,playerString,resString,round,fails); stopwatchOff(100,c);
+      }
     }
   }
 
@@ -126,7 +152,7 @@ public class Game{
   private String nominate(int round){
     Character leader = (char)(rand.nextInt(numPlayers)+65);
     int mNum = missionNum[numPlayers-5][round-1];
-    String team = players.get(leader).do_Nominate(mNum);
+    stopwatchOn(); String team = players.get(leader).do_Nominate(mNum); stopwatchOff(1000,leader);
     char[] tA = team.toCharArray();
     Arrays.sort(tA);
     boolean legit = tA.length==mNum;
@@ -138,8 +164,9 @@ public class Game{
       team = "";
       for(int i = 0; i< mNum; i++) team+=(char)(65+i);
     }
-    for(Character c: players.keySet())
-      players.get(c).get_ProposedMission(leader+"", team);
+    for(Character c: players.keySet()){
+      stopwatchOn(); players.get(c).get_ProposedMission(leader+"", team); stopwatchOff(100, c);
+    }
     log(leader+" nominated "+team);
     return team;
   }
@@ -153,13 +180,18 @@ public class Game{
    int votes = 0;
    String yays = "";
    for(Character c: players.keySet()){
+      stopwatchOn(); 
       if(players.get(c).do_Vote()){
         votes++;
         yays+=c;
        }
+      stopwatchOff(1000,c);
     }
-    for(Character c: players.keySet())
+    for(Character c: players.keySet()){
+      stopwatchOn();
       players.get(c).get_Votes(yays);
+      stopwatchOff(100,c);
+    }
     log(votes+" votes for: "+yays);
     return (votes>numPlayers/2);  
   }
@@ -173,15 +205,22 @@ public class Game{
    * @return the number of agents who betray the mission.
    * */
   public int mission(String team){
-    for(Character c: players.keySet())
+    for(Character c: players.keySet()){
+      stopwatchOn();
       players.get(c).get_Mission(team);
+      stopwatchOff(100,c);
+    }
     int traitors = 0;
     for(Character c: team.toCharArray()){
-      //check for spies here.
-      if(players.get(c).do_Betray()) traitors++;
+      stopwatchOn();
+      if(spies.contains(c) && players.get(c).do_Betray()) traitors++;
+      stopwatchOff(1000,c);
     }
-    for(Character c: players.keySet())
+    for(Character c: players.keySet()){
+      stopwatchOn();
       players.get(c).get_Traitors(traitors);
+      stopwatchOff(100,c);
+    }
     log(traitors +" betrayed the mission");
     return traitors;  
   }
@@ -206,12 +245,18 @@ public class Game{
       else log("Mission succeeded");
       statusUpdate(round+1, fails);
       HashMap<Character,String> accusations = new HashMap<Character, String>();
-      for(Character c: players.keySet())
+      for(Character c: players.keySet()){
+        stopwatchOn();
         accusations.put(c,players.get(c).do_Accuse());
+        stopwatchOff(1000,c);
+      }
       for(Character c: players.keySet()){
         log(c+" accuses "+accusations.get(c));
-        for(Character a: players.keySet())
+        for(Character a: players.keySet()){
+          stopwatchOn();
           players.get(a).get_Accusation(c+"", accusations.get(c));
+          stopwatchOff(100,c);
+        }
       }  
     }
     if(fails>2) log("Government Wins! "+fails+" missions failed.");
@@ -225,11 +270,6 @@ public class Game{
    **/
   public static void main(String[] args){
     Game g = new Game();
-    g.addPlayer(new RandomAgent());
-    g.addPlayer(new RandomAgent());
-    g.addPlayer(new RandomAgent());
-    g.addPlayer(new RandomAgent());
-    g.addPlayer(new RandomAgent());
     g.addPlayer(new RandomAgent());
     g.addPlayer(new RandomAgent());
     g.addPlayer(new RandomAgent());
