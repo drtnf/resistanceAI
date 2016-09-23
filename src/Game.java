@@ -221,7 +221,7 @@ public class Game{
       players.get(c).get_Traitors(traitors);
       stopwatchOff(100,c);
     }
-    log(traitors +" betrayed the mission");
+    log(traitors +(traitors==1?" spy ":" spies ")+ "betrayed the mission");
     return traitors;  
   }
 
@@ -270,11 +270,11 @@ public class Game{
    **/
   public static void main(String[] args){
     Game g = new Game();
-    g.addPlayer(new RandomAgent());
-    g.addPlayer(new RandomAgent());
-    g.addPlayer(new RandomAgent());
-    g.addPlayer(new RandomAgent());
-    g.addPlayer(new HumanAgent());
+    g.stopwatchOn();g.addPlayer(new RandomAgent());g.stopwatchOff(1000,'A');
+    g.stopwatchOn();g.addPlayer(new RandomAgent());g.stopwatchOff(1000,'B');
+    g.stopwatchOn();g.addPlayer(new RandomAgent());g.stopwatchOff(1000,'C');
+    g.stopwatchOn();g.addPlayer(new RandomAgent());g.stopwatchOff(1000,'D');
+    g.stopwatchOn();g.addPlayer(new RandomAgent());g.stopwatchOff(1000,'E');
     g.setup();
     g.play();
   }
