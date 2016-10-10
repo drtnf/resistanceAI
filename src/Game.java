@@ -232,12 +232,11 @@ public class Game{
     int fails = 0;
     int leader = (rand.nextInt(numPlayers));
     for(int round = 1; round<=5; round++){
-      String team = nominate(round, playerString.charAt(leader++));
+      String team = nominate(round, playerString.charAt(leader++%numPlayers));
+      leader%=numPlayers;
       int voteRnd = 0;
-      while(voteRnd++<5 && !vote()){
-        leader%=numPlayers;
-        team = nominate(round, playerString.charAt(leader++));
-      }
+      while(voteRnd++<5 && !vote())
+        team = nominate(round, playerString.charAt(leader++%numPlayers));
       log(team+" elected");
       int traitors = mission(team);
       if(traitors !=0 && (traitors !=1 || round !=4 || numPlayers<7)){
