@@ -149,8 +149,7 @@ public class Game{
    * @param round the round in the game the mission is for.
    * @return a String containing the names of the agents being sent on the mission
    * */
-  private String nominate(int round){
-    Character leader = (char)(rand.nextInt(numPlayers)+65);
+  private String nominate(int round, Character leader){
     int mNum = missionNum[numPlayers-5][round-1];
     stopwatchOn(); String team = players.get(leader).do_Nominate(mNum); stopwatchOff(1000,leader);
     char[] tA = team.toCharArray();
@@ -231,11 +230,14 @@ public class Game{
    * */
   public void play(){
     int fails = 0;
+    int leader = (rand.nextInt(numPlayers));
     for(int round = 1; round<=5; round++){
-      String team = nominate(round);
+      String team = nominate(round, playerString.charAt(leader++));
       int voteRnd = 0;
-      while(voteRnd++<5 && !vote())
-        team = nominate(round);
+      while(voteRnd++<5 && !vote()){
+        leader%=numPlayers;
+        team = nominate(round, playerString.charAt(leader++));
+      }
       log(team+" elected");
       int traitors = mission(team);
       if(traitors !=0 && (traitors !=1 || round !=4 || numPlayers<7)){
