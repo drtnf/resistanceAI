@@ -36,7 +36,7 @@ public class HumanAgent implements Agent{
   }
 
   /**
-   * Reports the current status, inlcuding players name, the name of all players, the names of the spies (if known), the mission number and the number of failed missions
+   * Reports the current status, including players name, the name of all players, the names of the spies (if known), the mission number and the number of failed missions
    * @param name a string consisting of a single letter, the agent's names.
    * @param players a string consisting of one letter for everyone in the game.
    * @param spies a String consisting of the latter name of each spy, if the agent is a spy, or n questions marks where n is the number of spies allocated; this should be sufficient for the agent to determine if they are a spy or not. 
@@ -94,12 +94,12 @@ public class HumanAgent implements Agent{
    * @param yays the names of the agents who voted for the mission
    **/
   public void get_Votes(String yays){
-    write("Players "+yays+" voted for the mssion");
+    write("Players "+yays+" voted for the mission");
   }
 
   /**
    * Reports the agents being sent on a mission.
-   * Should be able to be infered from tell_ProposedMission and tell_Votes, but incldued for completeness.
+   * Should be able to be inferred from tell_ProposedMission and tell_Votes, but included for completeness.
    * @param mission the Agents being sent on a mission
    **/
   public void get_Mission(String mission){
