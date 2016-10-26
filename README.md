@@ -24,7 +24,20 @@ This is done privately, and the only public information released is how many peo
 If at least 3 missions succeed, the resistance wins. Otherwise the government wins.
 
 ##Rules - AI bots
-Rules will be added here for the AI bots. They must implement the provided agent interface, and we will add restrictions for the amount of computation, and system resources they can use.
-We will also develop a points mechanism to encourage creative play.
+1. AI bots must implement the provided agent interface, and we will add restrictions for the amount of computation, and system resources they can use.
+2. As mentioned in the agent interface, get methods are limited to 0.1 second of compute time, do methods are limited to 1 second of compute time.
+3. Agents may not use threading to access any additional computational resources.
+4. Agents may not read or write from the file system. Agents should not print to the screen either.
+5. Agents should have a parameterless constructor
+5. Java classes should have unique names. Please append your student number to the end of each class name to avoid clashes.
+6. The tournament will will be a selection of random games. Game.java has a sample tournament file.
+7. Agents will be randomly selected to play in games of between 5 and 10 players. There may be two or more instances of the one agent in a game.
+8. There will be a large number of plays to give all agents a chance to play both sides.
+9. Agents will be ranked on the percentage of games they win, regardless of whetehr they are a spy or a resistance member.
+10. Any attempt to cheat will result in immediate disqualification.
+11. Any Agent who crashes, or gets stuck in an infinite loop will be removed from the tournament.
+12. Agents who go over time, will be penalised or removed from the competition.
+
+Good luck.
 
 
