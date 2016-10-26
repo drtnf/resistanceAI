@@ -1,1 +1,0 @@
-<tr><td>Randy</td><td>Tim</td><td>3</td><td>13</td><td>17</td><td>21</td><td>0.5882352941176471</td></tr>
