@@ -372,8 +372,8 @@ public class Game{
               if(fails>2) cc.resLoss();
               else cc.resWin();
             }
-          }  
           g.log(cc.toString());
+          }  
         }
       }    
     }
