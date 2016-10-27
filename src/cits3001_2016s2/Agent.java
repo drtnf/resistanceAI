@@ -1,3 +1,5 @@
+package cits3001_2016s2;
+
 /**
  * A Java interface for an agent to play in Resistance.
  * Each agent is given a single capital letter, which will be their name for the game.
