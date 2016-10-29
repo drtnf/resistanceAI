@@ -50,17 +50,17 @@ package cits3001_2016s2;
     }
   
     public double spyWinRate(){
-      return (1.0*spyWins)/spyPlays;
+      return (1.0d*spyWins)/spyPlays;
     }
 
     public double resWinRate(){
-      return (1.0*resWins)/resPlays;
+      return (1.0d*resWins)/resPlays;
     }
 
     public double winRate(){
       return (1.0*(spyWins+resWins))/(spyPlays+resPlays);
     }
-
+d
     public String toString(){
       return "<tr><td>"+name+
         "</td><td>"+authors+
