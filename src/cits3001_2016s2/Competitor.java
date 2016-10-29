@@ -60,7 +60,7 @@ package cits3001_2016s2;
     public double winRate(){
       return (1.0*(spyWins+resWins))/(spyPlays+resPlays);
     }
-d
+
     public String toString(){
       return "<tr><td>"+name+
         "</td><td>"+authors+
