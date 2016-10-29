@@ -38,7 +38,7 @@ public class Game{
    * @param logFile path to the log file
    * */
   public Game(String fName){
-    logFile = new File(fName, true);
+    logFile = new File(fName);
     logging = true;
     init();
   }
@@ -62,7 +62,7 @@ public class Game{
   private void log(String msg){
     if(logging){
       try{
-        FileWriter log = new FileWriter(logFile);
+        FileWriter log = new FileWriter(logFilei, true);
         log.write(msg);
         log.close();
       }catch(IOException e){e.printStackTrace();}
