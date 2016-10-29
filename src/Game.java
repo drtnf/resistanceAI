@@ -36,7 +36,7 @@ public class Game{
    * @param logFile path to the log file
    * */
   public Game(String fName){
-    logFile = new File(fName);
+    logFile = new File(fName, true);
     logging = true;
     init();
   }
