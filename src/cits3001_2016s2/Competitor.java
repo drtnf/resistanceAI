@@ -69,6 +69,8 @@ package cits3001_2016s2;
         "</td><td>"+resWins+
         "</td><td>"+resPlays+
         "</td><td>"+winRate()+
+        "</td><td>"+spyWinRate()+
+        "</td><td>"+resWinRate()+
         "</td></tr>\n";
     }
   }
