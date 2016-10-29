@@ -276,7 +276,7 @@ public class Game{
 
 
 
-  static class Competitor implements Comparable{
+  public static class Competitor implements Comparable{
     private Class agent;
     private String name;
     private String authors;
