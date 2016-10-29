@@ -347,6 +347,8 @@ public class Game{
         "</td><td>"+resWins+
         "</td><td>"+resPlays+
         "</td><td>"+winRate()+
+        "</td><td>"+spyWinRate()+
+        "</td><td>"+resWinRate()+
         "</td></tr>\n";
     }
   }
@@ -384,7 +386,7 @@ public class Game{
     }
     Arrays.sort(agents);
     String ret = 
-    "<html><body><table><tr><th>Name</th><th>Author</th><th>Spy Wins</th><th>Spy Plays</th><th>Res Wins</th><th>Res Plays</th><th>Win Rate</th></tr>";
+    "<html><body><table><tr><th>Name</th><th>Author</th><th>Spy Wins</th><th>Spy Plays</th><th>Res Wins</th><th>Res Plays</th><th>Win Rate</th><th>Spy Win Rate</th><th>Res Win Rate</th></tr>";
     for(int i = 0; i< agents.length; i++)
       ret+= agents[i];
     return ret+"</table></body></html>";  
