@@ -18,6 +18,8 @@ public class Game{
   private static final int[] spyNum = {2,2,3,3,3,4}; //spyNum[n-5] is the number of spies in an n player game
   private static final int[][] missionNum = {{2,3,2,3,3},{2,3,4,3,4},{2,3,3,4,4},{3,4,4,5,5},{3,4,4,5,5},{3,4,4,5,5}};
                                     //missionNum[n-5][i] is the number to send on mission i in a  in an n player game
+  public static final String lineSeparator = System.getProperty("line.separator");
+
   private Random rand;
   private File logFile;
   private boolean logging = false;
@@ -35,7 +37,7 @@ public class Game{
 
   /**
    * Creates an empty game
-   * @param logFile path to the log file
+   * @param fName path to the log file
    * */
   public Game(String fName){
     logFile = new File(fName);
@@ -64,6 +66,7 @@ public class Game{
       try{
         FileWriter log = new FileWriter(logFile, true);
         log.write(msg);
+        log.write(lineSeparator);
         log.close();
       }catch(IOException e){e.printStackTrace();}
     }
