@@ -62,7 +62,7 @@ public class Game{
   private void log(String msg){
     if(logging){
       try{
-        FileWriter log = new FileWriter(logFilei, true);
+        FileWriter log = new FileWriter(logFile, true);
         log.write(msg);
         log.close();
       }catch(IOException e){e.printStackTrace();}
