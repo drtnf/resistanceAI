@@ -1,5 +1,6 @@
 package cits3001_2016s2;
 
+
 import java.util.*;
 import java.io.*;
 /**
@@ -18,8 +19,6 @@ public class Game{
   private static final int[] spyNum = {2,2,3,3,3,4}; //spyNum[n-5] is the number of spies in an n player game
   private static final int[][] missionNum = {{2,3,2,3,3},{2,3,4,3,4},{2,3,3,4,4},{3,4,4,5,5},{3,4,4,5,5},{3,4,4,5,5}};
                                     //missionNum[n-5][i] is the number to send on mission i in a  in an n player game
-  public static final String lineSeparator = System.getProperty("line.separator");
-
   private Random rand;
   private File logFile;
   private boolean logging = false;
@@ -37,7 +36,7 @@ public class Game{
 
   /**
    * Creates an empty game
-   * @param fName path to the log file
+   * @param logFile path to the log file
    * */
   public Game(String fName){
     logFile = new File(fName);
@@ -66,7 +65,6 @@ public class Game{
       try{
         FileWriter log = new FileWriter(logFile, true);
         log.write(msg);
-        log.write(lineSeparator);
         log.close();
       }catch(IOException e){e.printStackTrace();}
     }
@@ -279,77 +277,6 @@ public class Game{
 
 
 
-  public static class Competitor implements Comparable{
-    private Class agent;
-    private String name;
-    private String authors;
-    public int spyWins;
-    public int spyPlays;
-    public int resWins;
-    public int resPlays;
-
-    public Competitor(Agent agent, String name, String authors){
-      this.agent = agent.getClass();
-      this.name = name;
-      this.authors = authors;
-    }
-
-    public int compareTo(Object o){
-      try{
-        Competitor c = (Competitor) o;
-        return (int)(1000*(this.winRate()-c.winRate()));
-      }
-      catch(Exception e){return 1;}
-    }
-
-    public Agent getAgent(){
-     try{return (Agent)agent.newInstance();}
-     catch(Exception e){return null;}
-    }
-
-    public String getName(){return name;}
-
-    public String getAuthors(){return authors;}
-
-    public void spyWin(){
-      spyWins++;spyPlays++;
-    }
-
-    public void spyLoss(){
-      spyPlays++;
-    }
-
-    public void resWin(){
-      resWins++;resPlays++;
-    }
-
-    public void resLoss(){
-      resPlays++;
-    }
-  
-    public double spyWinRate(){
-      return (1.0*spyWins)/spyPlays;
-    }
-
-    public double resWinRate(){
-      return (1.0*resWins)/resPlays;
-    }
-
-    public double winRate(){
-      return (1.0*(spyWins+resWins))/(spyPlays+resPlays);
-    }
-
-    public String toString(){
-      return "<tr><td>"+name+
-        "</td><td>"+authors+
-        "</td><td>"+spyWins+
-        "</td><td>"+spyPlays+
-        "</td><td>"+resWins+
-        "</td><td>"+resPlays+
-        "</td><td>"+winRate()+
-        "</td></tr>\n";
-    }
-  }
 
   public static String tournament(Competitor[] agents, int rounds){
     Random tRand = new Random();
@@ -406,15 +333,8 @@ public class Game{
     g.play();
     */
     /*Run a tournament*/
-    try{
-      File f = new File("Results.html");
-      FileWriter fw = new FileWriter(f);
-      Competitor[] contenders = {new Competitor(new RandomAgent(),"Randy","Tim")};
-      fw.write(tournament(contenders, 10));
-      fw.close();
-    }
-    catch(IOException e){System.out.println("IO fail");}
-  }
+  }    
+  
 
 }  
 
