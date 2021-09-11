@@ -4,6 +4,23 @@ AI platform for the card game resistance.
 # Description
 This projects aims to provide a set of java classes and interface to facilliate agents playing Don Eskridge's card game: Resistance.
 
+# Getting started
+
+## Python
+
+To build an agent in python, you should copy the template provided in the `random_agent.py` module. 
+That is, you should subclass the Agent class (defined in the `agent.py` module) and fill in the methods there.
+To manage agents in ad-hoc tournaments, it is recommended that you incorporate your student number in the module containing your agent code,
+and have all your code in the one module.
+
+To run the contest, you should edit the `__main__.py` file to import you agent class, and add your agents to the agent array.
+
+The basic command line game code can then be executed using the command:
+
+`python3 resistance`
+
+called from `src-py` (the directory containing the `resistance` package).
+
 #Rules
 
 ##Rules - resistance
