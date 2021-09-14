@@ -35,7 +35,7 @@ class Game:
         #start game for each agent        
         for agent_id in range(self.num_players):
             spy_list = self.spies.copy() if agent_id in self.spies else []
-            agents[agent_id].new_game(self.num_players,agent_id, spy_list)
+            self.agents[agent_id].new_game(self.num_players,agent_id, spy_list)
         #initialise rounds
         self.missions_lost = 0
         self.rounds = []
