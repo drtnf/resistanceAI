@@ -177,12 +177,20 @@ public class Game{
         fails = new boolean[players.length];
         int failNum = 0;
         for(int i = 0; i<team.length; i++)
-          if(fails[team[i]] = players[team[i]].betray(team.clone(), missionLead)) failNum++;
+          if(isSpy(team[i]) && (fails[team[i]] = players[team[i]].betray(team.clone(), missionLead))) failNum++;
         for(int i = 0; i<players.length; i++)
           players[i].missionOutcome(team.clone(), missionLead, failNum, isSuccess());
         log("Mission "+(isSuccess()?"succeeded":"failed")+" with "+failNum+" fails.");
       }
       else log("Mission not approved, votes for: "+voteString);
+    }
+
+    //helper method to report if agent's are spies.
+    boolean isSpy(int agent){
+      boolean spy = false;
+      for(int i = 0; i< spies.length; i++)
+        spy = spy || spies[i]==agent;
+      return spy;
     }
 
     public boolean approved(){
@@ -201,7 +209,7 @@ public class Game{
     public boolean isSuccess(){
       int failNum = 0;
       for(int i = 0; i<team.length; i++)
-        if(fails[team[i]]) failNum++;
+        if(!approved() || fails[team[i]]) failNum++;
       return failNum<fails2Fail;
     }
 
@@ -229,16 +237,16 @@ public class Game{
       missions = new Mission[5];
       mNum = 0;
       missions[0] = new Mission();
-      while(mNum<5 && !missions[mNum].approved())
+      while(mNum<4 && !missions[mNum].approved())
         missions[++mNum] = new Mission();
       for(int i = 0; i<players.length; i++)
         players[i].roundOutcome(round+1, round+1-getScore());
-      log("Resistance "+(successful()?"won":"lost")+" round "+round);
-      log(getScore() + " rounds of "+(round+1)+" successful.");
+      log("Resistance "+(successful()?"won":"lost")+" round "+(round+1));
+      log((getScore()+(successful()?1:0)) + " rounds of "+(round+1)+" successful.");
     }
 
     public boolean successful(){
-      return missions[mNum].isSuccess();
+      return missions[mNum].approved() && missions[mNum].isSuccess();
     }
 
     public Mission[] getMissions(){
@@ -251,7 +259,7 @@ public class Game{
    * Sets up game with random agents and plays
    **/
   public static void main(String[] args){
-    Agent[] agents = {HumanAgent.init(),
+    Agent[] agents = {RandomAgent.init(),
       RandomAgent.init(), 
       RandomAgent.init(),
       RandomAgent.init(), 
