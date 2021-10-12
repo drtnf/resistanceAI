@@ -240,7 +240,7 @@ public class Game{
       while(mNum<4 && !missions[mNum].approved())
         missions[++mNum] = new Mission();
       for(int i = 0; i<players.length; i++)
-        players[i].roundOutcome(round+1, round+1-getScore());
+        players[i].roundOutcome(round+1, round+1-(getScore()+(successful()?1:0)));
       log("Resistance "+(successful()?"won":"lost")+" round "+(round+1));
       log((getScore()+(successful()?1:0)) + " rounds of "+(round+1)+" successful.");
     }
