@@ -9,7 +9,7 @@ class Agent:
     #e.g. self.mission_size[8][3] is the number to be sent on the 3rd mission in a game of 8
     mission_sizes = {
             5:[2,3,2,3,3], \
-            6:[3,3,3,3,3], \
+            6:[2,3,4,3,4], \
             7:[2,3,3,4,4], \
             8:[3,4,4,5,5], \
             9:[3,4,4,5,5], \
