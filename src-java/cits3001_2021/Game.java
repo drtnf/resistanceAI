@@ -26,7 +26,7 @@ public class Game{
   private long stopwatch = 0;
 
   private static final int failsRequired(int playerNum, int round){
-    return (playerNum>6 && round==4)?2:1;
+    return (playerNum>6 && round==3)?2:1;
   }
 
   /**
