@@ -50,7 +50,7 @@ class Game:
                 a.round_outcome(i+1, self.missions_lost)
             leader_id = (leader_id+len(self.rounds[i].missions)) % len(self.agents)    
         for a in self.agents:
-            a.game_outcome(self.missions_lost<3, self.spies)
+            a.game_outcome(self.missions_lost>2, self.spies)
 
     def __str__(self):
         s = 'Game between agents:' + str(self.agents)
@@ -85,7 +85,7 @@ class Round():
         '''
         produces a string representation of the round
         '''
-        s = 'Round:' + str(self.rnd)
+        s = 'Round:' + str(self.rnd + 1)
         for m in self.missions:
             s = s +'\n'+str(m)
         if self.is_successful():
@@ -114,7 +114,7 @@ class Round():
         fails_required = Agent.fails_required[len(self.agents)][self.rnd]
         while len(self.missions)<5:
             team = self.agents[self.leader_id].propose_mission(mission_size, fails_required)
-            mission = Mission(self.leader_id, team, self.agents, self.spies, self.rnd)
+            mission = Mission(self.leader_id, team, self.agents, self.spies, self.rnd, len(self.missions)==4)
             self.missions.append(mission)
             self.leader_id = (self.leader_id+1) % len(self.agents)
             if mission.is_approved():
@@ -133,29 +133,30 @@ class Mission():
     a representation of a proposed mission
     '''
     
-    def __init__(self, leader_id, team, agents, spies, rnd):
+    def __init__(self, leader_id, team, agents, spies, rnd, auto_approve):
         '''
         leader_id is the id of the agent who proposed the mission
         team is the list of agent indexes on the mission
         agents is the list of agents in the game,
         spies is the list of indexes of spies in the game
         rnd is the round number of the game
+        auto_approve is true if this is the fifth mission proposed this round, and no vite is required.
         '''
         self.leader_id = leader_id
         self.team = team
         self.agents = agents
         self.spies = spies
         self.rnd = rnd
-        self.run()
+        self.run(auto_approve)
 
 
-    def run(self):    
+    def run(self, auto_approve):    
         '''
         Runs the mission, by asking agents to vote, 
         and if the vote is in favour,
         asking spies if they wish to fail the mission
         '''
-        self.votes_for = [i for i in range(len(self.agents)) if self.agents[i].vote(self.team, self.leader_id)]
+        self.votes_for = [i for i in range(len(self.agents)) if auto_approve or self.agents[i].vote(self.team, self.leader_id)]
         for a in self.agents:
             a.vote_outcome(self.team, self.leader_id, self.votes_for)
         if 2*len(self.votes_for) > len(self.agents):
