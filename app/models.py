@@ -134,26 +134,68 @@ class Plays(db.Model):
         return json.dumps(self.to_dict())
 
 
-class GameModel(db.Model):
+############
+#Needs serious refator to be stateful
+############
+
+
+class Game(db.Model):
     '''
     A class for recording a full play of a game of The Resistance.
     '''
+    #SQLAlchemy vars
     __tablename__='games'
     game_id = db.Column(db.Integer, primary_key = True)
     score = db.Column(db.Integer)
+    num_players = db.Column(db.Integer)
     spies = db.Column(db.String(5)) #only populated at the end.
-    rounds = db.relationship('RoundModel',backref='game',lazy=False)
-    #backrefs for rounds and missions 
+    rounds = db.relationship('Round',backref='game',lazy=False)
+    #backrefs for rounds and missions
+    
+    def play(self, agents):
+        if len(agents)<5 or len(agents)>10:
+            raise Exception('Agent array out of range')
+        #clone and shuffle agent array
+        self.agents = agents.copy()
+        random.shuffle(self.agents)
+        self.num_players = len(agents)
+        #allocate spies
+        self.spies = []
+        while len(self.spies) < Agent.spy_count[self.num_players]:
+            spy = random.randrange(self.num_players)
+            if spy not in self.spies:
+                self.spies.append(spy)
+        #start game for each agent        
+        for agent_id in range(self.num_players):
+            spy_list = self.spies.copy() if agent_id in self.spies else []
+            self.agents[agent_id].new_game(self.num_players,agent_id, spy_list)
+        #initialise rounds
+        self.missions_lost = 0
+        self.rounds = []
+        #commence rounds
+        leader_id = 0
+        for i in range(5):
+            rnd = Round()
+            rnd.game = self
+            self.rounds.append(rnd)
+            if not self.rounds[i].play(leader_id, self.agents, self.spies, i): self.missions_lost+= 1
+            for a in self.agents:
+                a.round_outcome(i+1, self.missions_lost)
+            leader_id = (leader_id+len(self.rounds[i].missions)) % len(self.agents)    
+        for a in self.agents:
+            a.game_outcome(self.missions_lost<3, self.spies)
+
 
     def to_dict(self):
         return {'game_id': self.game_id,
                 'score': self.score,
+                'num_players': self.num_players,
                 'spies': self.spies,
                 'rounds': [r.to_dict() for r in self.rounds]
                 }
 
     def from_dict(self, data):
-        for attr in ['game_id', 'score', 'spies']:
+        for attr in ['game_id', 'score', 'num_players', 'spies']:
             if attr in data:
                setattr(self, attr, data[attr])
         if 'rounds' in data:
@@ -162,6 +204,7 @@ class GameModel(db.Model):
     def __str__(self):
         desc = 'Game: ' + str(self.game_id) + \
                 '\nScore: ' + str(self.score) + \
+                '\nNumber of Players: ' + str(self.num_players) + \
                 '\nSpies: ' + str(self.spies) + \
                 '\nRounds: '
         rnd = 1        
@@ -173,8 +216,11 @@ class GameModel(db.Model):
     def __repr__(self):
         return json.dumps(self.to_dict())
 
+########################################
+RoundClass
+#######################################
 
-class RoundModel(db.Model):
+class Round(db.Model):
     '''
     A class for representing a full play of a round in a game of The Resistance.
     '''
@@ -183,7 +229,37 @@ class RoundModel(db.Model):
     game_id = db.Column(db.Integer, db.ForeignKey('games.game_id'), nullable = False)
     success = db.Column(db.Boolean)#resistance wins
     round_num = db.Column(db.Integer)
-    missions = db.relationship('MissionModel',backref='round',lazy=False)
+    missions = db.relationship('Mission',backref='round',lazy=False)
+
+    def play(self, leader_id, agents, spies, rnd):
+        '''
+        leader_id is the current leader (next to propose a mission)
+        agents is the list of agents in the game,
+        spies is the list of indexes of spies in the game
+        rnd is what round the game is up to 
+        '''
+        self.round_num = rnd
+        self.missions = []
+        #need to import Agent module?
+        mission_size = Agent.mission_sizes[len(self.agents)][self.rnd]
+        fails_required = Agent.fails_required[len(self.agents)][self.rnd]
+        while len(self.missions)<5:
+            team = self.agents[self.leader_id].propose_mission(mission_size, fails_required)
+            mission = Mission()
+            mission.round = self
+            mission.run(leader_id, team, agents, spies, rnd, len(self.missions)==4)
+            self.missions.append(mission)
+            self.leader_id = (self.leader_id+1) % len(self.agents)
+            if mission.is_approved():
+                return mission.is_successful()
+        return mission.is_successful()   
+
+
+    def is_successful(self):
+        '''
+        returns true is the mission was successful
+        '''
+        return len(self.missions)>0 and self.missions[-1].is_successful()
 
     def to_dict(self):
         return {'round_id': self.round_id,
@@ -214,9 +290,11 @@ class RoundModel(db.Model):
     def __repr__(self):
         return json.dumps(self.to_dict())
 
+################
+#Mission Class
+################
 
-
-class MissionModel(db.Model):
+class Mission(db.Model):
     '''
     A class for representing each mission, the team, the leader, 
     the vote and whether it was a success.
@@ -228,8 +306,29 @@ class MissionModel(db.Model):
     team_string = db.Column(db.String(5))
     vote_string = db.Column(db.String(10))
     approved = db.Column(db.Boolean)
-    fails = db.Column(db.Integer)
+    fails = db.Column(db.String(4))
     success = db.Column(db.Boolean)
+
+#mission.run(leader_id, team, agents, spies, rnd, len(self.missions)==4)
+
+    def run(self, leader_id, team, agents, spies, rnd, auto_approve):    
+        '''
+        Runs the mission, by asking agents to vote, 
+        and if the vote is in favour,
+        asking spies if they wish to fail the mission
+        '''
+        self.leader= leader_id
+        self.team_string = team
+        self.votes_for = [i for i in range(len(agents)) if auto_approve or self.agents[i].vote(team, leader_id)]
+        for a in agents:
+            a.vote_outcome(team, leader_id, self.votes_for)
+        if 2*len(self.votes_for) > len(agents):
+            self.fails = [i for i in team if i in spies and agents[i].betray(team, leader_id)]
+            success = len(self.fails) < Agent.fails_required[len(self.agents)][self.rnd]
+            for a in agents:
+                a.mission_outcome(team, leader_id, len(self.fails), success)
+
+
 
     '''
     creates a dictionary in json format:
@@ -240,7 +339,7 @@ class MissionModel(db.Model):
     team_string: '012',
     vote_string: '0123456',
     approved: true,
-    fails: 2,
+    fails: '02',
     success: false
     }
     '''
@@ -269,7 +368,7 @@ class MissionModel(db.Model):
                 '\nThe votes for were ' + self.vote_string + \
                 'and the mission was ' + \
                     ('not approved' if not self.approved else \
-                    'approved\nThere were ' + self.fails + 'failures and the mission ' + \
+                    'approved\nThere were ' + len(self.fails) + 'failures and the mission ' + \
                     ('succeeded' if self.success else 'failed')
                     )
 
