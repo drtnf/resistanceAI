@@ -1,8 +1,10 @@
 from flask import Flask, render_template, session, copy_current_request_context
+import socketio
 from flask_socketio import SocketIO, emit, disconnect
 
 app = Flask(__name__)
 socketio = SocketIO(app)
+#socketio = socketio.Server()
 
 @app.route('/')
 def index():
