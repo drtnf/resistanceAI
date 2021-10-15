@@ -4,11 +4,8 @@ from flask_socketio import send, emit
 import json
 import random
 
-
 #need external code that records the student number to Game map, to appropriate socket agent..
 #or can we write client harnesses that just use http requests to poll for data and post?
-
-
 
 class SocketAgent(Agent):        
     '''A sample implementation of a random agent in the game The Resistance'''
