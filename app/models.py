@@ -151,7 +151,134 @@ class Game(db.Model):
     spies = db.Column(db.String(5)) #only populated at the end.
     rounds = db.relationship('Round',backref='game',lazy=False)
     #backrefs for rounds and missions
-    
+
+
+    ##refactor to make stateful
+    def start(self, agents):
+        if len(agents)<5 or len(agents)>10:
+            raise Exception('Agent array out of range')
+        #clone and shuffle agent array
+        self.agents = agents.copy()
+        random.shuffle(self.agents)
+        self.num_players = len(agents)
+        #allocate spies
+        self.spies = []
+        while len(self.spies) < Agent.spy_count[self.num_players]:
+            spy = random.randrange(self.num_players)
+            if spy not in self.spies:
+                self.spies.append(spy)
+        #start game for each agent        
+        for agent_id in range(self.num_players):
+            spy_list = self.spies.copy() if agent_id in self.spies else []
+            self.agents[agent_id].new_game(self.num_players,agent_id, spy_list)
+        #initialise rounds and state variables
+        self.missions_lost = 0
+        self.rounds = []
+        self.current_round = 0
+        self.current_leader = 0
+        #counters for tracking game state
+        self.mission_proposed = False
+        self.votes_recieved = False
+        self.betrayals_recieved = False
+        #commence rounds
+        leader_id = 0
+
+    ## now we have events:
+    def rec_vote(self, agent_index, rnd, mission, approve):
+        ''' 
+        agent_index is the index of the agent voting
+        approve is true if the agent approves, false otherwise
+        '''
+        #get current mission of current round
+        #if rnd  = current, mission = current, and agent has not yet voted, update vote
+        #check if all votes receieved for current round, and then call game.next()?
+        pass
+
+    def rec_mission(self, leader_index, rnd, mission, team_string):
+        '''
+        leader_index is the index of the leader
+        rnd is the number of the rnd (0-4)
+        mission is the number of the mission (0-4)
+        team_string is a string of digits, one for each member of the team
+        '''
+        pass
+
+    def rec_betrayal(self, agent_index, rnd, mission, betray):
+        '''
+        agent_index is the index of the agent on the mission
+        rnd is the number of the rnd (0-4)
+        mission is the number of the mission (0-4)
+        betray is True if the agent chooses to betray, False otherwise.
+        '''
+        pass
+
+    def mission_request(self, timeout):
+        '''
+        Requests current leader to propose mission
+        time is an integer number of seconds
+        '''
+        pass
+
+    def vote_request(self, timeout):
+        '''
+        Requests all agents to vote on the current mission
+        '''
+        pass
+
+    def betrayal_request(self, timeout):
+        '''
+        Requests all spies on the current mission to choose whetehr or not to betray
+        '''
+        pass
+
+    def vote_notify(self):
+        '''
+        informs all agent of the outcome of the vote
+        '''
+        pass
+
+    def mission_notify(self):
+        '''
+        informs all agent of the outcome ofthe mission
+        '''
+        pass
+
+    def round_notify(self):
+        '''
+        informs all agents of the outcome of the current round
+        '''
+        pass
+
+    def game_notify(self):
+        '''
+        informs all agents of the outcome of the game, including the spie indentities
+        '''
+        pass
+
+    def next(self):
+        '''
+        general method for checking if the game/round/mission can move to the next phase,
+        and advancing it if possible.
+        '''
+        pass
+
+
+
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     def play(self, agents):
         if len(agents)<5 or len(agents)>10:
             raise Exception('Agent array out of range')

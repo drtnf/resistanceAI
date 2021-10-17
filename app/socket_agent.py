@@ -22,7 +22,7 @@ class SocketAgent(Agent):
         self.action_number = 0
 
 
-    def new_game(self, number_of_players, player_number, spy_list):
+    def new_game(self, number_of_players, player_number, spy_list, game):
         '''
         initialises the game, informing the agent of the 
         number_of_players, the player_number (an id number for the agent in the game),
@@ -38,6 +38,7 @@ class SocketAgent(Agent):
                 'spy_list': spy_list
                 }
         emit('new_game', json.dump(data), room=self.room)
+        self.game = game
 
 
     def is_spy(self):
@@ -58,9 +59,10 @@ class SocketAgent(Agent):
                 'betrayals_required': betrayals_required
                 }
         emit('propose_mission', json.dump(data), room=self.room, callback = self.get_team)
-        time.sleep(1) # terrible and hacky here?
-        #wait for response, use a callback?
-        #get response here
+
+
+    @socketio #some label here?
+    def get_team(self)
         team = resp.team
         if not check_team(team, team_size):
             #substitute random move? 
@@ -70,16 +72,6 @@ class SocketAgent(Agent):
                 if agent not in team:
                      team.append(agent)
         return team        
-
-    '''
-    Call back to get team
-    '''
-    def get_team(self, data):
-        if int(data['action_number'])==self.action_number:
-            self.team = data['team']
-        else:
-            self.team = ''
-
 
     '''
     checks a valid team is returned,
