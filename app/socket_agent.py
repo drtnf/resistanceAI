@@ -7,7 +7,7 @@ import random
 #need external code that records the student number to Game map, to appropriate socket agent..
 #or can we write client harnesses that just use http requests to poll for data and post?
 
-class SocketAgent(Agent):        
+class SocketAgent: #not subclassing from agent!        
     '''A sample implementation of a random agent in the game The Resistance'''
     #need to record a name for the agent, and a room id
     #each agent is in a separate room.
@@ -19,7 +19,6 @@ class SocketAgent(Agent):
         self.name = name
         self.student_number = student_number
         self.room = room
-        self.action_number = 0
 
 
     def new_game(self, number_of_players, player_number, spy_list, game):
@@ -47,23 +46,26 @@ class SocketAgent(Agent):
         '''
         return self.player_number in self.spy_list
 
-    def propose_mission(self, team_size, betrayals_required = 1):
+    def req_mission(self, team_size, betrayals_required = 1, rnd, mission):
         '''
         expects a team_size list of distinct agents with id between 0 (inclusive) and number_of_players (exclusive)
         to be returned. 
         betrayals_required are the number of betrayals required for the mission to fail.
         '''
         data = {
-                'action_number': self.action_number,
                 'team_size': team_size,
-                'betrayals_required': betrayals_required
+                'betrayals_required': betrayals_required,
+                'round': rnd,
+                'mission': mission
                 }
-        emit('propose_mission', json.dump(data), room=self.room, callback = self.get_team)
+        emit('propose_mission', json.dump(data), room=self.room)
+        #start timer
 
-
-    @socketio #some label here?
-    def get_team(self)
-        team = resp.team
+    @socketio.on('propose_mission', room=self.room)
+    def rec_mission(self, data):
+        team = data['team']
+        rnd = data['round']
+        mission = data['mission']
         if not check_team(team, team_size):
             #substitute random move? 
             team = []
@@ -71,7 +73,7 @@ class SocketAgent(Agent):
                 agent = random.randrange(team_size)
                 if agent not in team:
                      team.append(agent)
-        return team        
+        self.game.mission(self.player_number, rnd, mission, team)        
 
     '''
     checks a valid team is returned,
@@ -86,15 +88,30 @@ class SocketAgent(Agent):
         return chk    
             
 
-    def vote(self, mission, proposer):
+    def req_vote(self, team, leader, rnd, mission):
         '''
         mission is a list of agents to be sent on a mission. 
         The agents on the mission are distinct and indexed between 0 and number_of_players.
-        proposer is an int between 0 and number_of_players and is the index of the player who proposed the mission.
+        leader is an int between 0 and number_of_players and is the index of the player who proposed the mission.
         The function should return True if the vote is for the mission, and False if the vote is against the mission.
         '''
-        return random.random()<0.5
+        data = {
+                'team': team,
+                'leader': proposer, 
+                'round': rnd,
+                'mission': mission
+                }
+        emit('vote', json.dump(data), room=self.room)
+        #start timer
+        
+    @socketio.on('vote', room=self.room)
+    def rec_vote(self, data):
+        vote = data['vote']
+        rnd = data['round']
+        mission = data['mission']
+        self.game.vote(self.player_number, rnd, mission, vote)        
 
+    #just informative action
     def vote_outcome(self, mission, proposer, votes):
         '''
         mission is a list of agents to be sent on a mission. 
@@ -111,17 +128,30 @@ class SocketAgent(Agent):
         emit('vote_outcome', json.dump(data), room = self.room)
 
 
-    def betray(self, mission, proposer):
+    def req_betray(self, team, proposer, rnd, mission):
         '''
         mission is a list of agents to be sent on a mission. 
         The agents on the mission are distinct and indexed between 0 and number_of_players, and include this agent.
         proposer is an int between 0 and number_of_players and is the index of the player who proposed the mission.
-        The method should return True if this agent chooses to betray the mission, and False otherwise. 
-        By default, spies will betray 30% of the time. 
         '''
-        if self.is_spy():
-            return random.random()<0.3
+        data = {
+                'team': team,
+                'leader': proposer, 
+                'round': rnd,
+                'mission': mission
+                }
+        emit('betray', json.dump(data), room=self.room)
+        #start timer
 
+    @socketio.on('vote', room=self.room)
+    def rec_betray(self, data):
+        betray = data['betray']
+        rnd = data['round']
+        mission = data['mission']
+        self.game.betray(self.player_number, rnd, mission, betray)        
+
+
+    #just informative
     def mission_outcome(self, mission, proposer, betrayals, mission_success):
         '''
         mission is a list of agents to be sent on a mission. 
@@ -139,6 +169,7 @@ class SocketAgent(Agent):
                 }
         emit('mission_outcome', json.dump(data), room=self.room)
 
+    #just informative
     def round_outcome(self, rounds_complete, missions_failed):
         '''
         basic informative function, where the parameters indicate:
@@ -150,7 +181,8 @@ class SocketAgent(Agent):
                 'mission_failed': mission_failed
                 }
         emit('round_outcome', json.dump(data), room=self.room)
-    
+
+    #just informative
     def game_outcome(self, spies_win, spies):
         '''
         basic informative function, where the parameters indicate:
