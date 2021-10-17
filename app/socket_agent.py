@@ -1,6 +1,7 @@
 from agent import Agent
 from app import socketio
 from flask_socketio import send, emit
+from threading import Timer
 import json
 import random
 
@@ -19,6 +20,8 @@ class SocketAgent: #not subclassing from agent!
         self.name = name
         self.student_number = student_number
         self.room = room
+        self.timer = None
+        self.current_req = None
 
 
     def new_game(self, number_of_players, player_number, spy_list, game):
@@ -39,12 +42,34 @@ class SocketAgent: #not subclassing from agent!
         emit('new_game', json.dump(data), room=self.room)
         self.game = game
 
-
     def is_spy(self):
         '''
         returns True iff the agent is a spy
         '''
         return self.player_number in self.spy_list
+
+###include utility timeout function?
+###sets a timer 
+    def time_out(self):
+        if self.current_req is not None:
+            action = self.current_req['action']
+            rnd = self.current_req['round']
+            mission = self.current_req['mission']
+            emit('time_out', json.dump(self.current_req), room=self.room)
+            if action is 'propose_mission':
+                team = []
+                while len(team)<team_size:
+                    agent = random.randrange(team_size)
+                    if agent not in team:
+                        team.append(agent)
+                self.game.mission(self.player_number, rnd, mission, team)
+            elif action is 'vote':    
+                self.game.vote(self.player_number, rnd, mission, False)
+            elif action is 'betray':    
+                self.game.betray(self.player_number, rnd, mission, False)
+            self.current_req = None    
+
+
 
     def req_mission(self, team_size, betrayals_required = 1, rnd, mission):
         '''
@@ -59,15 +84,23 @@ class SocketAgent: #not subclassing from agent!
                 'mission': mission
                 }
         emit('propose_mission', json.dump(data), room=self.room)
-        #start timer
+        self.current_action = {'action':'propose_misson', 'round':rnd, 'mission':mission}
+        t = Timer(5.0, self.time_out) 
+        #after 5 seconds call rec_mission with an empty team 
+        #should probably log the time out????add this is later
+        #need a timeout function
+        t.start()
 
     @socketio.on('propose_mission', room=self.room)
     def rec_mission(self, data):
         team = data['team']
         rnd = data['round']
         mission = data['mission']
-        if not check_team(team, team_size):
-            #substitute random move? 
+        if self.current_action['action'] == 'propose_mission' and \
+                self.current_action['round'] == rnd and \
+                self.current_action['mission'] == mission:
+            self.current_action = None
+        if not check_team(team, Agent.mission_sizes[self.number_of_players][rnd]):
             team = []
             while len(team)<team_size:
                 agent = random.randrange(team_size)
@@ -102,13 +135,20 @@ class SocketAgent: #not subclassing from agent!
                 'mission': mission
                 }
         emit('vote', json.dump(data), room=self.room)
-        #start timer
+        self.current_action = {'action':'vote', 'round':rnd, 'mission':mission}
+        t = Timer(5.0, self.time_out) 
+        #after 5 seconds submot a default no vote. 
+        t.start()
         
     @socketio.on('vote', room=self.room)
     def rec_vote(self, data):
         vote = data['vote']
         rnd = data['round']
         mission = data['mission']
+        if self.current_action['action'] == 'vote' and \
+                self.current_action['round'] == rnd and \
+                self.current_action['mission'] == mission:
+            self.current_action = None
         self.game.vote(self.player_number, rnd, mission, vote)        
 
     #just informative action
@@ -141,13 +181,20 @@ class SocketAgent: #not subclassing from agent!
                 'mission': mission
                 }
         emit('betray', json.dump(data), room=self.room)
-        #start timer
+        self.current_action = {'action':'betray', 'round':rnd, 'mission':mission}
+        t = Timer(5.0, self.time_out) 
+        #after 5 seconds submit a default no betray. 
+        t.start()
 
     @socketio.on('vote', room=self.room)
     def rec_betray(self, data):
         betray = data['betray']
         rnd = data['round']
         mission = data['mission']
+        if self.current_action['action'] == 'betray' and \
+                self.current_action['round'] == rnd and \
+                self.current_action['mission'] == mission:
+            self.current_action = None
         self.game.betray(self.player_number, rnd, mission, betray)        
 
 
