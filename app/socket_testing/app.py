@@ -6,7 +6,7 @@ from flask_socketio import SocketIO, Namespace, emit
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
-sio = SocketIO(app)
+sio = SocketIO(app, logger=True, engineio_logger=True)
 
 @app.route('/')
 def index():
@@ -25,11 +25,12 @@ class SocketAgent(): #not subclassing from agent!
         self.student_number = student_number
         self.room = room
 
-    def on_connect(self):
-        print("connected.")
 
-    def on_disconnect(self):
-        print("disconnected.")
+    # Boilerplate for sending messages within the class 
+    # Needs the app context, a namespace ('/' is default) and a recipient (either an sid or broadcast to all)
+    def test_send(self):
+        with app.app_context():
+            emit('test_send', namespace = '/', broadcast = True)
 
     def on_new_game(self, number_of_players, player_number, spy_list, game):
         '''
@@ -49,20 +50,12 @@ class SocketAgent(): #not subclassing from agent!
         emit('new_game', json.dumps(data), room=self.room)
         self.game = game
 
-    def test_send(self):
-        print("working")
-        with app.app_context():
-            print('working in context')
-            emit('test_send', namespace = '/', broadcast = True)
-
 
     def on_is_spy(self):
         '''
         returns True iff the agent is a spy
         '''
-        with app.app_context():
-            emit('is_spy', namespace = '/', broadcast = True)
-        #return self.player_number in self.spy_list
+        return self.player_number in self.spy_list
 
     def on_req_mission(self, team_size, rnd, mission, betrayals_required = 1):
         '''
@@ -187,15 +180,11 @@ class SocketAgent(): #not subclassing from agent!
                 }
         emit('game_outcome', json.dump(data), room=self.room)
 
-    def on_sum(sid, data):
-        result = data['numbers'][0] + data['numbers'][1]
-        return {'result': result}
-
 
 @sio.on('test')
 def test_connect():
     print("test successful")
-    emit('test_reponse', {'data': "Server"})
+    emit('test_response', {'data': "Server"})
 
 @sio.on('propose_mission')
 def rec_mission(data):
@@ -234,8 +223,16 @@ def rec_betray(data):
     mission = data['mission']
     self.game.betray(self.player_number, rnd, mission, betray)  
 
-sa = SocketAgent("Tom", "20935166", 1)
-sa.test_send()
+
+@sio.on('connect')
+def connect():
+    sa = SocketAgent("Tom", "20935166", 1)
+    sa.test_send()
+    
+
+@sio.on('disconnect')
+def test_disconnect():
+    print('Client disconnected')
 
 def main():
     sio.run(app, debug = True)

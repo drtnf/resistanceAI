@@ -3,22 +3,19 @@ import sys
 import socketio
 import time
 
-sio = socketio.Client()
+sio = socketio.Client(logger=True, engineio_logger=True)
 
 
 @sio.event
 def connect():
     print('connected')
-    result = sio.call('sum', {'numbers': [1, 2]})
-    print(result)
 
 
 def test_response(args):
     print('on_test_response', args['data'])
 
-def is_spy_response():
-    print("is spy response")
 
+@sio.on('test_send')
 def test_send():
     print("test send")
 
@@ -32,11 +29,7 @@ def main(username):
     sio.connect('http://localhost:5000')
     # sio.connect('http://localhost:5000',
     #             headers={'X-Username': username})
-    time.sleep(2)
-    # sio.on('propose_mission', test_response)
-    sio.emit('test')
-    sio.on('test_send', is_spy_response)
-    # sio.emit('propose_mission', {'data': 'test'})
+    sio.wait()
 
 
 if __name__ == '__main__':
