@@ -1,5 +1,7 @@
 import base64
-from app import db, login
+from app import db, login, socketio
+from flask_socketio import send, emit
+from sqlalchemy.orm import relationship, backref
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
 from flask import url_for
@@ -9,10 +11,7 @@ import json
 
 #resistance imports: probably just hack the code in here?
 from agent import Agent
-from random_agent import RandomAgent
 import random
-
-
 
 
 #allows login to get student from database, given id
@@ -35,6 +34,8 @@ class Student(UserMixin, db.Model):
   #token authetication for api
   token = db.Column(db.String(32), index=True, unique = True)
   token_expiration=db.Column(db.DateTime)
+  #non-database fields
+  games = db.relationship('Game', secondary='plays', backref=db.backref('students', lazy='dynamic'))
 
   def set_password(self, password):
     self.password_hash = generate_password_hash(password)
@@ -111,6 +112,9 @@ class Plays(db.Model):
     student_id = db.Column(db.Integer, db.ForeignKey('students.id'), primary_key = True)
     agent_number = db.Column(db.Integer) #0-9, their identifier in the game
     time = db.Column(db.DateTime)
+    #references
+    student = db.relationship('Student', backref=db.backref('plays', lazy='dynamic'))
+    game = db.relationship('Game', backref=db.backref('plays', lazy='dynamic'))
 
     def to_dict(self):
         return {'game_id': self.game_id,
@@ -134,10 +138,9 @@ class Plays(db.Model):
         return json.dumps(self.to_dict())
 
 
-############
-#Needs serious refator to be stateful
-############
-
+#########
+#Game model for executing a single game
+#########
 
 class Game(db.Model):
     '''
@@ -149,18 +152,31 @@ class Game(db.Model):
     score = db.Column(db.Integer)
     num_players = db.Column(db.Integer)
     spies = db.Column(db.String(5)) #only populated at the end.
-    rounds = db.relationship('Round',backref='game',lazy=False)
     #backrefs for rounds and missions
+    rounds = db.relationship('Round', backref='game',lazy=False)
+    students = db.relationship('Student', secondary='plays')
 
-
-    ##refactor to make stateful
-    def start(self, agents):
-        if len(agents)<5 or len(agents)>10:
-            raise Exception('Agent array out of range')
-        #clone and shuffle agent array
-        self.agents = agents.copy()
-        random.shuffle(self.agents)
-        self.num_players = len(agents)
+    def start(self, students):
+        '''
+        Given array of students, check unique, shuffle, and instantiate plays relation
+        Then allocate spies, and broadcast to students
+        Then commence first round
+        '''
+        if len(students)<5 or len(students)>10:
+            raise Exception('Student array out of range')
+        for i in range(len(students)):
+            if student[i] in student[i+1:]: raise Exception('Students duplicated')
+        #shuffle student array
+        random.shuffle(students)
+        time = datetime.utcnow()
+        self.num_players = len(students)
+        for i in range(self.num_players):
+            plays = Plays()
+            plays.agent_number = i
+            plays.game = self
+            plays.student = students[i]
+            plays.time = time
+            db.session.add(plays)
         #allocate spies
         self.spies = []
         while len(self.spies) < Agent.spy_count[self.num_players]:
@@ -170,147 +186,39 @@ class Game(db.Model):
         #start game for each agent        
         for agent_id in range(self.num_players):
             spy_list = self.spies.copy() if agent_id in self.spies else []
-            self.agents[agent_id].new_game(self.num_players,agent_id, spy_list)
+            data = {
+                    'number_of_players': self.num_players,
+                    'player_number': agent_id,
+                    'spy_list': spy_list
+                    }
+            socket_agent.send('new_game', data, student)
         #initialise rounds and state variables
-        self.missions_lost = 0
-        self.rounds = []
-        self.current_round = 0
-        self.current_leader = 0
-        #counters for tracking game state
-        self.mission_proposed = False
-        self.votes_recieved = False
-        self.betrayals_recieved = False
-        #commence rounds
-        leader_id = 0
-
-    ## now we have events:
-    def rec_vote(self, agent_index, rnd, mission, approve):
-        ''' 
-        agent_index is the index of the agent voting
-        approve is true if the agent approves, false otherwise
-        '''
-        #get current mission of current round
-        #if rnd  = current, mission = current, and agent has not yet voted, update vote
-        #check if all votes receieved for current round, and then call game.next()?
-        pass
-
-    def rec_mission(self, leader_index, rnd, mission, team_string):
-        '''
-        leader_index is the index of the leader
-        rnd is the number of the rnd (0-4)
-        mission is the number of the mission (0-4)
-        team_string is a string of digits, one for each member of the team
-        '''
-        pass
-
-    def rec_betrayal(self, agent_index, rnd, mission, betray):
-        '''
-        agent_index is the index of the agent on the mission
-        rnd is the number of the rnd (0-4)
-        mission is the number of the mission (0-4)
-        betray is True if the agent chooses to betray, False otherwise.
-        '''
-        pass
-
-    def mission_request(self, timeout):
-        '''
-        Requests current leader to propose mission
-        time is an integer number of seconds
-        '''
-        pass
-
-    def vote_request(self, timeout):
-        '''
-        Requests all agents to vote on the current mission
-        '''
-        pass
-
-    def betrayal_request(self, timeout):
-        '''
-        Requests all spies on the current mission to choose whetehr or not to betray
-        '''
-        pass
-
-    def vote_notify(self):
-        '''
-        informs all agent of the outcome of the vote
-        '''
-        pass
-
-    def mission_notify(self):
-        '''
-        informs all agent of the outcome ofthe mission
-        '''
-        pass
-
-    def round_notify(self):
-        '''
-        informs all agents of the outcome of the current round
-        '''
-        pass
-
-    def game_notify(self):
-        '''
-        informs all agents of the outcome of the game, including the spie indentities
-        '''
-        pass
-
-    def next(self):
-        '''
-        general method for checking if the game/round/mission can move to the next phase,
-        and advancing it if possible.
-        '''
-        pass
-
-
-
-        
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    def play(self, agents):
-        if len(agents)<5 or len(agents)>10:
-            raise Exception('Agent array out of range')
-        #clone and shuffle agent array
-        self.agents = agents.copy()
-        random.shuffle(self.agents)
-        self.num_players = len(agents)
-        #allocate spies
-        self.spies = []
-        while len(self.spies) < Agent.spy_count[self.num_players]:
-            spy = random.randrange(self.num_players)
-            if spy not in self.spies:
-                self.spies.append(spy)
-        #start game for each agent        
-        for agent_id in range(self.num_players):
-            spy_list = self.spies.copy() if agent_id in self.spies else []
-            self.agents[agent_id].new_game(self.num_players,agent_id, spy_list)
-        #initialise rounds
-        self.missions_lost = 0
         self.rounds = []
         #commence rounds
-        leader_id = 0
-        for i in range(5):
-            rnd = Round()
-            rnd.game = self
-            self.rounds.append(rnd)
-            if not self.rounds[i].play(leader_id, self.agents, self.spies, i): self.missions_lost+= 1
-            for a in self.agents:
-                a.round_outcome(i+1, self.missions_lost)
-            leader_id = (leader_id+len(self.rounds[i].missions)) % len(self.agents)    
-        for a in self.agents:
-            a.game_outcome(self.missions_lost<3, self.spies)
+        leader = 0
+        self.next_round(leader)
+
+    def index_to_student(self, index):
+        return [p.student for p in self.plays if p.agent_number == index][0]  
+
+    def student_to_index(self, student):
+        return [p.agent_number for p in self.plays if p.student == student][0] 
+
+    def next_round(self, leader):
+        '''
+        moves to the next round, or finialises the game  if five rounds have been played
+        '''
+        if len(self.rounds) == 5: #game over
+            data = {
+                    'spies_win': spies_win,
+                    'spies': spies
+                    }
+            for student in game.students:
+                socket_agent.send('game_outcome', data)
+            db.session.add(self)# persistance, fill in
+        else:
+            self.rounds.append(Round())
+            self.rounds[-1].req_team(leader)
 
 
     def to_dict(self):
@@ -358,35 +266,30 @@ class Round(db.Model):
     round_num = db.Column(db.Integer)
     missions = db.relationship('Mission',backref='round',lazy=False)
 
-    def play(self, leader_id, agents, spies, rnd):
-        '''
-        leader_id is the current leader (next to propose a mission)
-        agents is the list of agents in the game,
-        spies is the list of indexes of spies in the game
-        rnd is what round the game is up to 
-        '''
-        self.round_num = rnd
-        self.missions = []
-        #need to import Agent module?
-        mission_size = Agent.mission_sizes[len(self.agents)][self.rnd]
-        fails_required = Agent.fails_required[len(self.agents)][self.rnd]
-        while len(self.missions)<5:
-            team = self.agents[self.leader_id].propose_mission(mission_size, fails_required)
-            mission = Mission()
-            mission.round = self
-            mission.run(leader_id, team, agents, spies, rnd, len(self.missions)==4)
-            self.missions.append(mission)
-            self.leader_id = (self.leader_id+1) % len(self.agents)
-            if mission.is_approved():
-                return mission.is_successful()
-        return mission.is_successful()   
+    '''
+    run the next mission
+    '''
+    def next_mission(self, leader):
+        if self.missions is None:
+            self.missions = []
+        self.missions.append(Mission())
+        self.missions[-1].req_team(leader)
 
+    def outcome(self):
+        data = {
+                'rounds_complete': len(self.game.rounds)
+                'missions_failed': len([r for r in game.rounds if not r.is_successful()])
+                }
+        for student in self.game.students:
+            socket_agent.send('round_outcome',data, student)
+        self.game.next_round((self.missions[-1].leader+1)%self.game.player_num)    
+            
 
     def is_successful(self):
         '''
         returns true is the mission was successful
         '''
-        return len(self.missions)>0 and self.missions[-1].is_successful()
+        return len(self.missions)>0 and self.missions[-1].approved and self.missions[-1].success
 
     def to_dict(self):
         return {'round_id': self.round_id,
@@ -417,6 +320,13 @@ class Round(db.Model):
     def __repr__(self):
         return json.dumps(self.to_dict())
 
+
+
+
+
+
+
+
 ################
 #Mission Class
 ################
@@ -429,6 +339,7 @@ class Mission(db.Model):
     __tablename__ = 'missions'
     mission_id = db.Column(db.Integer, primary_key = True)
     round_id = db.Column(db.Integer, db.ForeignKey('rounds.round_id', nullable = False))
+    mission_num = db.Column(db.Integer)
     leader = db.Column(db.Integer)
     team_string = db.Column(db.String(5))
     vote_string = db.Column(db.String(10))
@@ -436,25 +347,142 @@ class Mission(db.Model):
     fails = db.Column(db.String(4))
     success = db.Column(db.Boolean)
 
-#mission.run(leader_id, team, agents, spies, rnd, len(self.missions)==4)
 
-    def run(self, leader_id, team, agents, spies, rnd, auto_approve):    
-        '''
-        Runs the mission, by asking agents to vote, 
-        and if the vote is in favour,
-        asking spies if they wish to fail the mission
-        '''
-        self.leader= leader_id
-        self.team_string = team
-        self.votes_for = [i for i in range(len(agents)) if auto_approve or self.agents[i].vote(team, leader_id)]
-        for a in agents:
-            a.vote_outcome(team, leader_id, self.votes_for)
-        if 2*len(self.votes_for) > len(agents):
-            self.fails = [i for i in team if i in spies and agents[i].betray(team, leader_id)]
-            success = len(self.fails) < Agent.fails_required[len(self.agents)][self.rnd]
-            for a in agents:
-                a.mission_outcome(team, leader_id, len(self.fails), success)
+    def req_team(self, leader_id):
+        #socket emit propose team to room leader_id.student number, with token expected for mission x in round y
+        num_players = self.round.game.num_players
+        rnd = self.round.round_num
+        team_size = Agent.mission_sizes[num_players][rnd]
+        data = {
+                'team_size': team_size,
+                'betrayals_required': betrayals_required,
+                'round': rnd,
+                'mission': mission
+                }
+        socket_agent.send('propose_mission', data, student, token, self.rec_team)
 
+
+    def rec_team(self, leader_id, team_string):
+        num_players = self.round.game.num_players
+        rnd = self.round.round_num
+        team_size = Agent.mission_sizes[num_players][rnd]
+        if self.check_team(team_string, team_size):
+            self.team_string = team_string
+        else: 
+            self.team_string = random_team(num_players, team_size))
+        self.vote_string = ''
+        if self.mission_num<4:
+            req_vote()
+        else:
+            self.aproved = True
+            req_betray()
+
+
+    '''
+    checks a valid team is returned,
+    containing the right number of members,
+    where every member is an int from 0 to numplayers-1
+    and no member is repeated
+    '''
+    def check_team(self, team, team_size):
+        chk = len(team)==team_size
+        for i in range(team_size):
+            chk = chk and 0<=int(team[i]) and int(team[i]) <= self.number_of_players and not team[i] in team[i+1:]
+        return chk    
+        
+    '''
+    Generates a random team string 
+    for num_players with given team_size
+    '''
+    def random_team(self, num_players, team_size):
+        team = []
+        while len(team)<team_size:
+            agent = random.randrange(team_size)
+            if agent not in team:
+                team.append(agent)
+        return team        
+
+    '''
+    Requests votes from players, one by one
+    Design decision, concurrent requests? Yes
+    '''
+    def req_vote(self):
+        self.votes_required = List(range(self.round.game.num_players))
+        for student in self.round.game.students:
+            #need map of students to agents?
+            data = {
+                    'team': self.team_string,
+                    'leader': self.leader, 
+                    'round': self.round.round_num,
+                    'mission': self.mission_num
+                }
+            socket_agent.send('vote', data, student, token, self.rec_vote) 
+
+    '''
+    Code called when votes are received, one by one
+    '''
+    def rec_vote(self, player, vote):
+        if player in self.votes_required:
+            self.vote_string = self.vote_string + (str(player) if vote else '')
+            self.votes_required.remove(player)
+        if not self.votes_required: #all votes recieved
+            self.approved = len(self.vote_string)>num_players/2
+            #emit vote result to all players
+            if(self.approved):
+                req_betray()
+            else:
+                self.round.next_mission((self.leader+1)%self.round.game.player_num) # to implement
+            
+    '''
+    Requests betrayal choice from teams spies
+    '''
+    def req_betray(self):
+        self.team_spies = [i for i in self.team_string if i in self.round.game.spies]
+        self.fails = 0
+        if not self.team_spies:
+            self.success = True
+            #get students....?
+            for student in self.round.game.students:
+                data = {
+                        'mission': self.mission_num,
+                        'proposer': self.leader,
+                        'betrayals': self.fails,
+                        'mission_success': self.success
+                        }
+                socket_agent.send('mission_outcom',data, student)
+                self.round.outcome() # to fill in
+        else:
+            #build student spy list
+            for student in spy.students:#hack, to fix
+                #socketAgent request betrayal from agent for spy.
+                data = {
+                        'team': self.team_string,
+                        'leader': self.leader, 
+                        'round': self.round.round_num,
+                        'mission': self.mission_num
+                       }
+                socket_agent.send('betray', data, student, token, self.rec_betray) #game not required students can only be in one game at a time. 
+
+    '''
+    call back used when client returns with betrayal choice
+    '''
+    def rec_betray(self, player, betray):
+        if player in self.team_spies:
+            self.team_spies.remove(player)
+            if betray: self.fails = self.fails+1 
+        if not self.team_spies: #all betrayals received
+            self.success = self.fails < Agent.fails_required[self.round.game.num_players][self.round.round_num]
+            #emit mission outcome to all players
+            for student in self.round.game.students:
+                data = {
+                        'mission': self.mission_num,
+                        'proposer': self.leader,
+                        'betrayals': self.fails,
+                        'mission_success': self.success
+                        }
+                socket_agent.send('mission_outcome',data, student)
+                self.round.outcome() # to fill in
+        #else keep waiting...
 
 
     '''
