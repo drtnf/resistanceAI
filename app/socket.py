@@ -1,12 +1,11 @@
 from flask import Flask, render_template, session, copy_current_request_context
-from flask_socketio import SocketIO, emit, connect, disconnect
+from flask_socketio import SocketIO, emit, disconnect
 from threading import Timer
-from app.models import Student
 from app import socketio
 
 app = Flask(__name__)
 socketio = SocketIO(app)
-socketio = socketio.Server()
+#socketio = socketio.Server()
 '''
 dictionary for handling responses to action_requests
 '''
@@ -47,14 +46,13 @@ def request_action(action, data, student_id, callback, timeout=5):
     t.start()
 
 def default_action(student_id, game_id, rnd, mission, action):
-    return lambda: 
-        if (student_id, game_id, rnd, mission, action) in callbacks:
-            callbacks[(student_id, game_id, rnd, mission, action)]()
-            callbacks.remove((student_id, game_id, rnd, mission, action))
+    if (student_id, game_id, rnd, mission, action) in callbacks:
+        callbacks[(student_id, game_id, rnd, mission, action)]()
+        callbacks.remove((student_id, game_id, rnd, mission, action))
 
-            with app.app_context():
-                emit('timeout', {'game_id': game_id, 'round': rnd, 'mission': mission, 'action': action}, namespace = "/", room=str(student_id)) 
-    )
+        with app.app_context():
+            emit('timeout', {'game_id': game_id, 'round': rnd, 'mission': mission, 'action': action}, namespace = "/", room=str(student_id)) 
+    
 
 @socketio.on('send_action')
 def on_action(data):
@@ -65,15 +63,15 @@ def on_action(data):
     action = data['action']
     player_id = data['player_id']
     token = data['token'] # use g.user, and include token-auth in url
-    s = Student.get(student_id)
-    game = Game.get(game_id)
-    if token == s.token and game.get_student_id(player_id)== student_id: # else some thing funny going on.
-        if (student_id, game_id, rnd, mission, action) in callbacks:
-            callbacks[(student_id, game_id, rnd, mission, action)](data[choice])
-            callbacks.remove((sudent_id, game_id, rnd, mission, action))
+#    s = Student.get(student_id) #Let token_auth do verification???
+#    game = Game.get(game_id)
+#    if token == s.token and game.get_student_id(player_id)== student_id: # else some thing funny going on.
+    if (student_id, game_id, rnd, mission, action) in callbacks:
+        callbacks[(student_id, game_id, rnd, mission, action)](data[choice])
+        callbacks.remove((sudent_id, game_id, rnd, mission, action))
         #else method has timed out. do nothing
-    else:
-        pass #throw a shenenigans exception
+#    else:
+#        pass #throw a shenenigans exception
 
 #####
 #need code here for handling connect events.

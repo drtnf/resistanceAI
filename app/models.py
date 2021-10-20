@@ -9,7 +9,7 @@ import os
 import json
 
 #resistance imports: probably just hack the code in here?
-from agent import Agent
+from app.agent import Agent
 import random
 
 
@@ -270,7 +270,7 @@ class Game(db.Model):
         return json.dumps(self.to_dict())
 
 ########################################
-RoundClass
+#Round Class
 #######################################
 
 class Round(db.Model):
@@ -353,7 +353,7 @@ class Mission(db.Model):
     '''
     __tablename__ = 'missions'
     mission_id = db.Column(db.Integer, primary_key = True)
-    round_id = db.Column(db.Integer, db.ForeignKey('rounds.round_id', nullable = False))
+    round_id = db.Column(db.Integer, db.ForeignKey('rounds.round_id'), nullable = False)
     mission_num = db.Column(db.Integer)
     leader = db.Column(db.Integer)
     team_string = db.Column(db.String(5))
@@ -387,7 +387,7 @@ class Mission(db.Model):
         if self.check_team(team_string, team_size):
             self.team_string = team_string
         else: 
-            self.team_string = random_team(num_players, team_size))
+            self.team_string = random_team(num_players, team_size)
         self.vote_string = ''
         if self.mission_num<4:
             req_vote()
