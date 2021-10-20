@@ -14,35 +14,40 @@ def index():
     return render_template('index.html')
 
 
-def send_to_student(name, data, student, callback=None, timeout=5):
+def send(name, data, student):
     '''
     name is the name of the function being called
     data is a json data object
     student is the student id to whom the message is being sent
-    callback is an optional parameter to be called when the student next send a message
-    timeout is the number of seconds until the callback reverts to default.
     '''
-    if callback is not None:
-        callbacks.put(student, callback)
     emit(name, data, room=str(student))
+
+
+def request_action(name, data, student, callback, timeout):
+    pass
     #some timing stuff
-    Student.get(student).set_timer(5, callback)
-    
+    #Student.get(student).set_timer(5, callback)
+
+
 @socketio.on('send_action')
 def on_action(data):
-    student = data['student']
+    student_id = data['student_id']
+    game_id = data['game_id']
+    rnd = data['round']
+    mission = data['mission']
     token = data['token']
     action = data['action']
-    s = Student.get(student)
-    ##hmmmm need game to get player id? almost better to have this tied to plays
-    ##or include game in the call.
-    
+    player_id = data['player_id']
+    s = Student.get(student_id)
+    game = Game.get(game_id)
+    if token == s.token and game.get_student_id(player_id)== student_id: # else some thing funny going on.
+        pass
     #check token and get player id
     #get callback from callbacks dictionary
-    if student in callbacks:
-        student.cancel_timer()
-        callbacks[student]('player_id'=player_id)
-        callbacks.remove(student)
+    #if student in callbacks:
+    #    student.cancel_timer()
+    #    callbacks[student]('player_id'=player_id)
+    #    callbacks.remove(student)
 
 
 
