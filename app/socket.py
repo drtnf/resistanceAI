@@ -7,27 +7,47 @@ from app import socketio
 #app = Flask(__name__)
 #socketio = SocketIO(app)
 #socketio = socketio.Server()
+'''
+dictionary for handling responses to action_requests
+'''
 callbacks = {}
+
+'''
+game queue of players waiting to join game
+'''
+player_queue = []
+
 
 @app.route('/')#basic landing page
 def index():
     return render_template('index.html')
 
 
-def send(name, data, student):
+def send(name, data, student_id):
     '''
     name is the name of the function being called
     data is a json data object
     student is the student id to whom the message is being sent
     '''
-    emit(name, data, room=str(student))
+    emit(name, data, room=str(student_id))
 
 
-def request_action(name, data, student, callback, timeout):
-    pass
-    #some timing stuff
-    #Student.get(student).set_timer(5, callback)
+def request_action(action, data, student_id, callback, timeout=5):
+    game_id = data['game_id']
+    rnd = data['round']
+    mission = data['mission']
+    player_id = data['player_id']
+    callbacks.put((student_id, game_id, rnd, mission, action), callback)
+    emit(action, data, room=str(student_id))
+    t = Timer(timeout, default_action, args=[student_id, game_id, rnd, mission, action])
+    t.start()
 
+def default_action(student_id, game_id, rnd, mission, action):
+    return lambda:
+        if (student_id, game_id, rnd, mission, action) in callbacks:
+            callbacks[(student_id, game_id, rnd, mission, action)]()
+            callbacks.remove((student_id, game_id, rnd, mission, action))
+            emit('timeout', {'game_id': game_id, 'round': rnd, 'mission': mission, 'action': action}, room=str(student_id)) 
 
 @socketio.on('send_action')
 def on_action(data):
@@ -35,19 +55,71 @@ def on_action(data):
     game_id = data['game_id']
     rnd = data['round']
     mission = data['mission']
-    token = data['token']
     action = data['action']
     player_id = data['player_id']
+    token = data['token'] # use g.user, and include token-auth in url
     s = Student.get(student_id)
     game = Game.get(game_id)
     if token == s.token and game.get_student_id(player_id)== student_id: # else some thing funny going on.
-        pass
-    #check token and get player id
-    #get callback from callbacks dictionary
-    #if student in callbacks:
-    #    student.cancel_timer()
-    #    callbacks[student]('player_id'=player_id)
-    #    callbacks.remove(student)
+        if (student_id, game_id, rnd, mission, action) in callbacks:
+            callbacks[(student_id, game_id, rnd, mission, action)](data[choice])
+            callbacks.remove((sudent_id, game_id, rnd, mission, action))
+        #else method has timed out. do nothing
+    else:
+        pass #throw a shenenigans exception
+
+#####
+#need code here for handling connect events.
+#####
+
+'''
+Process:
+On connection request:
+    check authentication
+    add to queue
+    acknowledge connection
+Every X seconds check if queue longer than 5:
+    If queue >=5:
+       pick random game size, N, from 5 to min(10, queue_length)
+       sample N players from first 20 people in queue, 
+       put N players in array players
+       create new Game.
+       call g.start(players)
+
+two functions to write
+'''
+@socketio.on('connect')
+def connect():#add token auth flag???
+    '''
+    On connection request:
+    check authentication
+    add to queue
+    acknowledge connection
+    '''
+    with app.app_context():
+        student_id = g['user']
+        join_room(str(student_id))
+        if student_id not in player_queue:
+            player_queue.append(student_id)
+        send(student_id + ' has been added to game queue.', to=str(student_id))
+
+def start_game():        
+    '''
+    Every X seconds check if queue longer than 5:
+    If queue >=5:
+       pick random game size, N, from 5 to min(10, queue_length)
+       sample N players from first 20 people in queue, 
+       put N players in array players
+       create new Game.
+       call game.start(players)
+    '''
+    pass
+
+
+
+
+
+
 
 
 
