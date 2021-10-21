@@ -34,7 +34,7 @@ class Student(UserMixin, db.Model):
     token = db.Column(db.String(32), index=True, unique = True)
     token_expiration=db.Column(db.DateTime)
     #non-database fields
-    games = db.relationship('Game', secondary='plays', backref=db.backref('students', lazy='dynamic'))
+    games = db.relationship('Game', secondary='plays') # backref=db.backref('students', lazy='dynamic'))
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -177,7 +177,7 @@ class Game(db.Model):
         if len(students)<5 or len(students)>10:
             raise Exception('Student array out of range')
         for i in range(len(students)):
-            if student[i] in student[i+1:]: raise Exception('Students duplicated')
+            if students[i] in students[i+1:]: raise Exception('Students duplicated')
         #shuffle student array
         random.shuffle(students)
         time = datetime.utcnow()
@@ -209,6 +209,7 @@ class Game(db.Model):
         self.rounds = []
         #commence rounds
         leader = 0
+        db.session.commit()
         self.next_round(leader)
 
     def get_student_id(self, player_id):
@@ -234,8 +235,11 @@ class Game(db.Model):
             for student in game.students:
                 socket.send('game_outcome', data, student)
             db.session.add(self)# persistance, fill in
+            db.session.commit()
         else:
-            self.rounds.append(Round())
+            rnd = Round(game_id=self.game_id, round_num=len(self.rounds))
+            db.session.add(rnd)
+            self.rounds.append(rnd)
             self.rounds[-1].req_team(leader)
 
 
@@ -290,10 +294,13 @@ class Round(db.Model):
     def next_mission(self, leader):
         if self.missions is None:
             self.missions = []
+        mission = Mission(round_id = self.round_id, leader=leader, mission_num=len(self.missions))
+        db.session.add(mission)
         self.missions.append(Mission())
-        self.missions[-1].req_team(leader)
+        self.missions[-1].req_team()
 
     def outcome(self):
+        self.success = self.is_successful()
         data = {
                 'game_id': self.game_id,
                 'round_num': len(self.game.rounds),
@@ -363,7 +370,7 @@ class Mission(db.Model):
     success = db.Column(db.Boolean)
 
 
-    def req_team(self, leader_id):
+    def req_team(self):
         #socket emit propose team to room leader_id.student number, with token expected for mission x in round y
         num_players = self.round.game.num_players
         rnd = self.round.round_num
@@ -373,7 +380,7 @@ class Mission(db.Model):
                 'game_id': self.round.game.game_id,
                 'round': self.round.round_num,
                 'mission': self.mission_num,
-                'player_id': leader_id,
+                'player_id': self.leader,
                 'team_size': team_size,
                 'betrayals_required': betrayals_required
                 }
@@ -387,7 +394,7 @@ class Mission(db.Model):
         if self.check_team(team_string, team_size):
             self.team_string = team_string
         else: 
-            self.team_string = random_team(num_players, team_size)
+            self.team_string = random_team(num_players, team_size)    
         self.vote_string = ''
         if self.mission_num<4:
             req_vote()
