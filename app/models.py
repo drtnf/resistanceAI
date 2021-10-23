@@ -7,7 +7,10 @@ from flask import url_for
 from datetime import datetime, timedelta
 import os
 import json
-
+#
+#nice idea to abstract out socket with io (input?) for debugging purposes?
+#Only 7 instances to cover?
+#
 #resistance imports: probably just hack the code in here?
 from app.agent import Agent
 import random
@@ -204,7 +207,8 @@ class Game(db.Model):
                     'player_number': agent_id,
                     'spy_list': spy_list
                     }
-            socket.send('new_game', data, student)
+            #socket.send('new_game', data, student)
+            print('new_game', data, student)
         #initialise rounds and state variables
         self.rounds = []
         #commence rounds
@@ -233,7 +237,8 @@ class Game(db.Model):
                     'spies': spies
                     }
             for student in game.students:
-                socket.send('game_outcome', data, student)
+                #socket.send('game_outcome', data, student)
+                print('game_outcome', data, student)
             db.session.add(self)# persistance, fill in
             db.session.commit()
         else:
@@ -307,7 +312,8 @@ class Round(db.Model):
                 'missions_failed': len([r for r in game.rounds if not r.is_successful()])
                 }
         for student in self.game.students:
-            socket.send('round_outcome', data, student)
+            #socket.send('round_outcome', data, student)
+            print('round_outcome', data, student)
         self.game.next_round((self.missions[-1].leader+1)%self.game.player_num)    
             
 
@@ -384,7 +390,8 @@ class Mission(db.Model):
                 'team_size': team_size,
                 'betrayals_required': betrayals_required
                 }
-        socket.request_action('propose_mission', data, student_id, lambda x: self.rec_team(player_id, x))
+        #socket.request_action('propose_mission', data, student_id, lambda x: self.rec_team(player_id, x))
+        self.rec_team(player_id, input('propose_mission'+'\n'+str(data)+'\n'+str(student_id))
 
 
     def rec_team(self, leader_id, team_string=''):
@@ -444,7 +451,8 @@ class Mission(db.Model):
                     'team': self.team_string,
                     'leader': self.leader 
                 }
-            socket.request_action('vote', data, student_id, lambda x: self.rec_vote(player_id, x)) 
+            #socket.request_action('vote', data, student_id, lambda x: self.rec_vote(player_id, x)) 
+            self.rec_vote(player_id, input('vote'+'\n'+str(data)+'\n'+str(student_id)))
 
     '''
     Code called when votes are received, one by one
@@ -480,7 +488,8 @@ class Mission(db.Model):
                         'betrayals': self.fails,
                         'mission_success': self.success
                         }
-                socket.send('mission_outcome',data, student)
+                #socket.send('mission_outcome',data, student)
+                print('mission_outcome',data, student)
                 self.round.outcome()
         else:
             #build student spy list
@@ -494,7 +503,8 @@ class Mission(db.Model):
                         'team': self.team_string,
                         'leader': self.leader
                        }
-                socket.request_action('betray', data, student_id, lambda x: self.rec_betray(player_id, x)) #game not required students can only be in one game at a time. 
+                #socket.request_action('betray', data, student_id, lambda x: self.rec_betray(player_id, x))
+                self.rec_betray(player_id, input('betray'+'\n'+str(data)+'\n'+str(student_id)))
 
     '''
     call back used when client returns with betrayal choice
@@ -516,7 +526,8 @@ class Mission(db.Model):
                         'betrayals': self.fails,
                         'mission_success': self.success
                         }
-                socket_agent.send('mission_outcome',data, student_id)
+                #socket_agent.send('mission_outcome',data, student_id)
+                print('mission_outcome',data, student_id)
                 self.round.outcome() # to fill in
         #else keep waiting...
 
