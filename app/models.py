@@ -37,7 +37,7 @@ class Student(UserMixin, db.Model):
     token = db.Column(db.String(32), index=True, unique = True)
     token_expiration=db.Column(db.DateTime)
     #non-database fields
-    games = db.relationship('Game', secondary='plays') # backref=db.backref('students', lazy='dynamic'))
+    #games = db.relationship('Game', secondary='plays', backref=db.backref('students', lazy='dynamic'))
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -169,7 +169,7 @@ class Game(db.Model):
     spies = db.Column(db.String(5)) #only populated at the end.
     #backrefs for rounds and missions
     rounds = db.relationship('Round', backref='game',lazy=False)
-    students = db.relationship('Student', secondary='plays')
+    #students = db.relationship('Student', secondary='plays')
 
     def start(self, students):
         '''
@@ -193,22 +193,22 @@ class Game(db.Model):
             plays.time = time
             db.session.add(plays)
         #allocate spies
-        self.spies = []
+        self.spies = ''
         while len(self.spies) < Agent.spy_count[self.num_players]:
-            spy = random.randrange(self.num_players)
+            spy = str(random.randrange(self.num_players))
             if spy not in self.spies:
-                self.spies.append(spy)
+                self.spies = self.spies+str(spy)
         #start game for each agent        
         for agent_id in range(self.num_players):
-            spy_list = self.spies.copy() if agent_id in self.spies else []
+            spy_list = [spy for spy in self.spies if str(agent_id) in self.spies]
             data = {
                     'game_id': self.game_id,
                     'number_of_players': self.num_players,
                     'player_number': agent_id,
                     'spy_list': spy_list
                     }
-            #socket.send('new_game', data, student)
-            print('new_game', data, student)
+            #socket.send('new_game', data, self.get_student_id(student))
+            print('new_game', data, self.get_student_id(agent_id))
         #initialise rounds and state variables
         self.rounds = []
         #commence rounds
@@ -220,7 +220,7 @@ class Game(db.Model):
         '''
         maps a players id to the corresponding student_id
         '''
-        return [p.student_id for p in self.plays if p.agent_number == index][0]  
+        return [p.student_id for p in self.plays if p.agent_number == player_id][0]  
 
 #not required?
 #    def student_to_index(self, student):
@@ -233,19 +233,19 @@ class Game(db.Model):
         if len(self.rounds) == 5: #game over
             data = {
                     'game_id': self.game_id,
-                    'spies_win': spies_win,
-                    'spies': spies
+                    'spies_win': self.spies_win,
+                    'spies': self.spies
                     }
-            for student in game.students:
-                #socket.send('game_outcome', data, student)
-                print('game_outcome', data, student)
+            for agent_id in range(self.num_players):
+                #socket.send('game_outcome', data, self.get_student_id(agent_id))
+                print('game_outcome', data, self.get_student_id(agent_id))
             db.session.add(self)# persistance, fill in
             db.session.commit()
         else:
             rnd = Round(game_id=self.game_id, round_num=len(self.rounds))
             db.session.add(rnd)
             self.rounds.append(rnd)
-            self.rounds[-1].req_team(leader)
+            self.rounds[-1].next_mission(leader)
 
 
     def to_dict(self):
@@ -391,7 +391,7 @@ class Mission(db.Model):
                 'betrayals_required': betrayals_required
                 }
         #socket.request_action('propose_mission', data, student_id, lambda x: self.rec_team(player_id, x))
-        self.rec_team(player_id, input('propose_mission'+'\n'+str(data)+'\n'+str(student_id))
+        self.rec_team(player_id, input('propose_mission'+'\n'+str(data)+'\n'+str(student_id)))
 
 
     def rec_team(self, leader_id, team_string=''):
@@ -579,7 +579,4 @@ class Mission(db.Model):
         return json.dumps(self.to_dict())
 
     
-
-
-
 
