@@ -26,18 +26,18 @@ class Student(UserMixin, db.Model):
     '''
     Student class to represent a classmember who submits an agent to the tournament.
     '''
-    __tablename__='students'
+    __tablename__='student'
     id = db.Column(db.String(8), primary_key = True)#prepopulate
     first_name = db.Column(db.String(64))#prepopulate
     last_name = db.Column(db.String(64))#prepopulate
     agent_name = db.Column(db.String(64))#submitted by student
-    agent_src = db.Column(db.LargeBinary())
+    agent_source = db.Column(db.LargeBinary())
     password_hash = db.Column(db.String(128))#arbitrary password
     #token authetication for api
     token = db.Column(db.String(32), index=True, unique = True)
     token_expiration=db.Column(db.DateTime)
     #non-database fields
-    #games = db.relationship('Game', secondary='plays', backref=db.backref('students', lazy='dynamic'))
+    games = db.relationship('Game', secondary='plays') 
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -78,7 +78,7 @@ class Student(UserMixin, db.Model):
         When a client returns in time
         '''
         self.timer.cancel()
-        
+
     '''Adding in dictionary methods to convert to JSON
        Format
        {
@@ -109,7 +109,7 @@ class Student(UserMixin, db.Model):
                 self.id, \
                 self.__str__()
                 )
-           
+
     def __str__(self):
       return self.first_name+' '+self.last_name +' ('+self.agent_name+')'
 
@@ -123,8 +123,8 @@ class Plays(db.Model):
     A class for recording a student's agent's role in a game.
     '''
     __tablename__ = 'plays'
-    game_id = db.Column(db.Integer, db.ForeignKey('games.game_id'),primary_key = True)
-    student_id = db.Column(db.Integer, db.ForeignKey('students.id'), primary_key = True)
+    game_id = db.Column(db.Integer, db.ForeignKey('game.game_id'),primary_key = True)
+    student_id = db.Column(db.Integer, db.ForeignKey('student.id'), primary_key = True)
     agent_number = db.Column(db.Integer) #0-9, their identifier in the game
     time = db.Column(db.DateTime)
     #references
@@ -150,7 +150,7 @@ class Plays(db.Model):
                 ' on ' + str(self.time)
 
     def __repr__(self):
-        return json.dumps(self.to_dict())
+        return json.dumps(self.to_dict(), default=str) # DateTime is not serializable
 
 
 #########
@@ -162,14 +162,14 @@ class Game(db.Model):
     A class for recording a full play of a game of The Resistance.
     '''
     #SQLAlchemy vars
-    __tablename__='games'
+    __tablename__='game'
     game_id = db.Column(db.Integer, primary_key = True)
     score = db.Column(db.Integer)
     num_players = db.Column(db.Integer)
     spies = db.Column(db.String(5)) #only populated at the end.
     #backrefs for rounds and missions
     rounds = db.relationship('Round', backref='game',lazy=False)
-    #students = db.relationship('Student', secondary='plays')
+    students = db.relationship('Student', secondary='plays')
 
     def start(self, students):
         '''
@@ -201,6 +201,7 @@ class Game(db.Model):
         #start game for each agent        
         for agent_id in range(self.num_players):
             spy_list = [spy for spy in self.spies if str(agent_id) in self.spies]
+            #self.spies_list = [spy for spy in self.spies]
             data = {
                     'game_id': self.game_id,
                     'number_of_players': self.num_players,
@@ -220,17 +221,18 @@ class Game(db.Model):
         '''
         maps a players id to the corresponding student_id
         '''
-        return [p.student_id for p in self.plays if p.agent_number == player_id][0]  
+        return [p.student_id for p in self.plays if p.agent_number == player_id][0]
 
 #not required?
 #    def student_to_index(self, student):
-#        return [p.agent_number for p in self.plays if p.student == student][0] 
+#        return [p.agent_number for p in self.plays if p.student == student][0]
 
     def next_round(self, leader):
         '''
         moves to the next round, or finialises the game  if five rounds have been played
         '''
         if len(self.rounds) == 5: #game over
+            self.spies_win = len([r for r in self.rounds if r.is_successful()]) < 3
             data = {
                     'game_id': self.game_id,
                     'spies_win': self.spies_win,
@@ -269,11 +271,11 @@ class Game(db.Model):
                 '\nNumber of Players: ' + str(self.num_players) + \
                 '\nSpies: ' + str(self.spies) + \
                 '\nRounds: '
-        rnd = 1        
+        rnd = 1
         for r in self.rounds:
             desc =  desc + '\n' + str(rnd) +  str(r)
             n = n+1
-        return desc    
+        return desc
 
     def __repr__(self):
         return json.dumps(self.to_dict())
@@ -286,9 +288,9 @@ class Round(db.Model):
     '''
     A class for representing a full play of a round in a game of The Resistance.
     '''
-    __tablename__ = 'rounds'
+    __tablename__ = 'round'
     round_id = db.Column(db.Integer, primary_key = True)
-    game_id = db.Column(db.Integer, db.ForeignKey('games.game_id'), nullable = False)
+    game_id = db.Column(db.Integer, db.ForeignKey('game.game_id'), nullable = False)
     success = db.Column(db.Boolean)#resistance wins
     round_num = db.Column(db.Integer)
     missions = db.relationship('Mission',backref='round',lazy=False)
@@ -301,7 +303,7 @@ class Round(db.Model):
             self.missions = []
         mission = Mission(round_id = self.round_id, leader=leader, mission_num=len(self.missions))
         db.session.add(mission)
-        self.missions.append(Mission())
+        self.missions.append(mission)
         self.missions[-1].req_team()
 
     def outcome(self):
@@ -309,13 +311,12 @@ class Round(db.Model):
         data = {
                 'game_id': self.game_id,
                 'round_num': len(self.game.rounds),
-                'missions_failed': len([r for r in game.rounds if not r.is_successful()])
+                'missions_failed': len([r for r in self.game.rounds if not r.is_successful()])
                 }
         for student in self.game.students:
             #socket.send('round_outcome', data, student)
             print('round_outcome', data, student)
-        self.game.next_round((self.missions[-1].leader+1)%self.game.player_num)    
-            
+        self.game.next_round((self.missions[-1].leader+1)%self.game.num_players)
 
     def is_successful(self):
         '''
@@ -328,9 +329,8 @@ class Round(db.Model):
                 'game_id': self.game_id,
                 'success': self.success,
                 'round_num': self.round_num,
-                'missions': [m.to_dict() for m in missions]
+                'missions': [m.to_dict() for m in self.missions]
                 }
-        
 
     def from_dict(self, data):
         for attr in ['round_id', 'game_id', 'success', 'round_num']:
@@ -346,13 +346,11 @@ class Round(db.Model):
                 '\n Missions: '
         for m in self.missions:
             desc = desc + str(m)
-        return desc    
+        return desc
 
 
     def __repr__(self):
         return json.dumps(self.to_dict())
-
-
 
 
 ################
@@ -361,12 +359,12 @@ class Round(db.Model):
 
 class Mission(db.Model):
     '''
-    A class for representing each mission, the team, the leader, 
+    A class for representing each mission, the team, the leader,
     the vote and whether it was a success.
     '''
-    __tablename__ = 'missions'
+    __tablename__ = 'mission'
     mission_id = db.Column(db.Integer, primary_key = True)
-    round_id = db.Column(db.Integer, db.ForeignKey('rounds.round_id'), nullable = False)
+    round_id = db.Column(db.Integer, db.ForeignKey('round.round_id'), nullable = False)
     mission_num = db.Column(db.Integer)
     leader = db.Column(db.Integer)
     team_string = db.Column(db.String(5))
@@ -378,36 +376,34 @@ class Mission(db.Model):
 
     def req_team(self):
         #socket emit propose team to room leader_id.student number, with token expected for mission x in round y
-        num_players = self.round.game.num_players
+        self.num_players = self.round.game.num_players
         rnd = self.round.round_num
-        team_size = Agent.mission_sizes[num_players][rnd]
-        student_id = self.round.game.get_student_id(leader_id)
+        self.team_size = Agent.mission_sizes[self.num_players][rnd]
+        self.fails_required = Agent.fails_required[self.num_players][rnd]
+        student_id = self.round.game.get_student_id(self.leader)
+        player_id  = self.leader
         data = {
                 'game_id': self.round.game.game_id,
                 'round': self.round.round_num,
                 'mission': self.mission_num,
-                'player_id': self.leader,
-                'team_size': team_size,
-                'betrayals_required': betrayals_required
+                'player_id': player_id,
+                'team_size': self.team_size,
+                'betrayals_required': self.fails_required
                 }
         #socket.request_action('propose_mission', data, student_id, lambda x: self.rec_team(player_id, x))
-        self.rec_team(player_id, input('propose_mission'+'\n'+str(data)+'\n'+str(student_id)))
+        self.rec_team(player_id, input('propose_mission'+'\n'+str(data)+'\n'+str(student_id)+'\n> '))
 
 
     def rec_team(self, leader_id, team_string=''):
-        num_players = self.round.game.num_players
-        rnd = self.round.round_num
-        team_size = Agent.mission_sizes[num_players][rnd]
-        if self.check_team(team_string, team_size):
-            self.team_string = team_string
-        else: 
-            self.team_string = random_team(num_players, team_size)    
+        self.team_string = self.check_team(team_string)
+        if not self.team_string: # if check_team returned False, generate a random team
+            self.team_string = self.random_team()
         self.vote_string = ''
         if self.mission_num<4:
-            req_vote()
+            self.req_vote()
         else:
             self.approved = True
-            req_betray()
+            self.req_betray()
 
 
     '''
@@ -416,31 +412,45 @@ class Mission(db.Model):
     where every member is an int from 0 to numplayers-1
     and no member is repeated
     '''
-    def check_team(self, team, team_size):
-        chk = len(team)==team_size
-        for i in range(team_size):
-            chk = chk and 0<=int(team[i]) and int(team[i]) <= self.number_of_players and not team[i] in team[i+1:]
-        return chk    
-        
+    def check_team(self, team):
+        try:
+            # remove duplicates, convert to ints, then sort
+            team = sorted([int(i) for i in set(team)])
+        except ValueError:
+            # converting to int did not work, so there were some non-digit chars in team string
+            return False
+        if len(team) != self.team_size:
+            return False
+        # assuming that team is already in sorted order
+        if 0 <= team[0] and team[-1] < self.num_players:
+            # convert back to string
+            return "".join([str(i) for i in team])
+        return False
+
     '''
-    Generates a random team string 
+    Generates a random team string
     for num_players with given team_size
     '''
-    def random_team(self, num_players, team_size):
+    def random_team(self):
         team = []
-        while len(team)<team_size:
-            agent = random.randrange(team_size)
+        while len(team)<self.team_size:
+            agent = random.randrange(self.num_players)
             if agent not in team:
                 team.append(agent)
-        return team        
+        return "".join([str(i) for i in sorted(team)])
 
     '''
     Requests votes from players, one by one
     Design decision, concurrent requests? Yes
     '''
     def req_vote(self):
-        self.votes_required = List(range(self.round.game.num_players))
-        for player_id in self.votes_required:
+        self.votes_required = list(range(self.num_players))
+        '''
+        without sockets, looping over self.votes_required causes bugs (not all
+        players get to vote). when changing back to using sockets, could change
+        loop back to how it was before, if sockets don't have the same bug
+        '''
+        for player_id in range(self.num_players):
             student_id = self.round.game.get_student_id(player_id)
             #need map of students to agents?
             data = {
@@ -449,10 +459,10 @@ class Mission(db.Model):
                     'mission': self.mission_num,
                     'player_id': player_id,
                     'team': self.team_string,
-                    'leader': self.leader 
+                    'leader': self.leader
                 }
-            #socket.request_action('vote', data, student_id, lambda x: self.rec_vote(player_id, x)) 
-            self.rec_vote(player_id, input('vote'+'\n'+str(data)+'\n'+str(student_id)))
+            #socket.request_action('vote', data, student_id, lambda x: self.rec_vote(player_id, x))
+            self.rec_vote(player_id, input('vote'+'\n'+str(data)+'\n'+str(student_id)+'\n> '))
 
     '''
     Code called when votes are received, one by one
@@ -462,23 +472,23 @@ class Mission(db.Model):
             self.vote_string = self.vote_string + (str(player) if vote else '')
             self.votes_required.remove(player)
         if not self.votes_required: #all votes recieved
-            self.approved = len(self.vote_string)>num_players/2
-            #emit vote result to all players
+            self.approved = len(self.vote_string)>self.num_players/2
+            # TODO: emit vote result to all players
             if(self.approved):
-                req_betray()
+                self.req_betray()
             else:
-                self.round.next_mission((self.leader+1)%self.round.game.player_num) # to implement
-            
+                self.round.next_mission((self.leader+1)%self.num_players) # to implement
+
     '''
     Requests betrayal choice from teams spies
     '''
     def req_betray(self):
-        self.team_spies = [i for i in self.team_string if i in self.round.game.spies]
+        self.team_spies = [int(i) for i in self.team_string if i in self.round.game.spies]
         self.fails = 0
         if not self.team_spies:
             self.success = True
             #get students....?
-            for player_id in range(self.round.game.num_players):
+            for player_id in range(self.num_players):
                 student_id = self.round.game.get_student_id(player_id)
                 data = {
                         'game_id': self.round.game.game_id,
@@ -488,12 +498,18 @@ class Mission(db.Model):
                         'betrayals': self.fails,
                         'mission_success': self.success
                         }
-                #socket.send('mission_outcome',data, student)
-                print('mission_outcome',data, student)
-                self.round.outcome()
+                #socket.send('mission_outcome',data, student_id)
+                print('mission_outcome',data, student_id)
+            self.round.outcome()
         else:
             #build student spy list
-            for player_id in self.team_spies:
+            '''
+            without sockets, looping over self.team_spies causes bugs (not all spies get
+            to betray). when changing back to using sockets, could change
+            loop back to how it was before, if sockets don't have the same bug
+            '''
+            spies_list = self.team_spies.copy()
+            for player_id in spies_list:
                 student_id = self.round.game.get_student_id(player_id)
                 #socketAgent request betrayal from agent for spy.
                 data = {
@@ -504,7 +520,7 @@ class Mission(db.Model):
                         'leader': self.leader
                        }
                 #socket.request_action('betray', data, student_id, lambda x: self.rec_betray(player_id, x))
-                self.rec_betray(player_id, input('betray'+'\n'+str(data)+'\n'+str(student_id)))
+                self.rec_betray(player_id, input('betray'+'\n'+str(data)+'\n'+str(student_id)+'\n> '))
 
     '''
     call back used when client returns with betrayal choice
@@ -512,11 +528,11 @@ class Mission(db.Model):
     def rec_betray(self, player, betray=False):
         if player in self.team_spies:
             self.team_spies.remove(player)
-            if betray: self.fails = self.fails+1 
+            if betray: self.fails = self.fails+1
         if not self.team_spies: #all betrayals received
-            self.success = self.fails < Agent.fails_required[self.round.game.num_players][self.round.round_num]
+            self.success = self.fails < self.fails_required
             #emit mission outcome to all players
-            for player_id in range(self.round.game.num_players):
+            for player_id in range(self.num_players):
                 student_id = self.round.game.get_student_id(player_id)
                 data = {
                         'game_id': self.round.game.game_id,
@@ -527,8 +543,8 @@ class Mission(db.Model):
                         'mission_success': self.success
                         }
                 #socket_agent.send('mission_outcome',data, student_id)
-                print('mission_outcome',data, student_id)
-                self.round.outcome() # to fill in
+                print('mission_outcome', data, student_id)
+            self.round.outcome() # to fill in
         #else keep waiting...
 
 
@@ -577,6 +593,4 @@ class Mission(db.Model):
 
     def __repr__(self):
         return json.dumps(self.to_dict())
-
-    
 
