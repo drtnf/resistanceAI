@@ -2,17 +2,85 @@ import asyncio
 import sys
 import socketio
 import time
+from random_agent import random_agent as agent
 
 sio = socketio.Client(logger=True, engineio_logger=True)
 
+student_number = "00000000"
+token = "my_security_token"
+url = 'http://localhost:5000'
+
 
 @sio.event
-def connect():
-    print('connected')
+def connect(data):
+    print('Connected.')
 
+@sio.event
+def new_game(data):
+    agent.new_game(data['number_of_players'], data['player_number'], [spy for spy in data['spy_list']])
+    
 
-def test_response(args):
-    print('on_test_response', args['data'])
+@sio.event
+def game_outcome(data):
+    agent.game_outcome(data['spies_win'],[spy for spy in data['spies']])
+    
+
+@sio.event
+def round_outcome(data):
+    agent.round_outcome(data['round_num'], data['missions_failed'])
+    
+
+@sio.event
+def mission_outcome(data):
+    agent.mission_outcome(data['mission'], data['proposer'], data['betrayals'], data['mission_success'])
+
+@sio.event
+def vote_outcome(data):
+    agent.vote_outcome(data['team'], data['leader'], [player for player in data['votes_for']])
+
+@sio.event
+def propose_mission(data):
+    team = agent.propose_mission(data['team_size'], data['betrayals_required'])
+    team_string = ('').join([str(c) for c in team])
+    resp={
+            'student_id': student_id,
+            'game_id': data['game_id'],
+            'round': data['round'],
+            'mission': data['mission'],
+            'action': 'propose_mission',
+            'player_id': data['player_id'],
+            'choice': team_string
+            }
+    sio.emit('send_action', resp)
+    
+
+@sio.event
+def vote(data):
+    approve = agent.vote([player for player in data['team']], data['leader'])
+    resp={
+            'student_id': student_id,
+            'game_id': data['game_id'],
+            'round': data['round'],
+            'mission': data['mission'],
+            'action': 'vote',
+            'player_id': data['player_id'],
+            'choice': approve
+            }
+    sio.emit('send_action', resp)
+    
+@sio.event
+def betray(data):
+    fail = agent.vote([player for player in data['team']], data['leader'])
+    resp={
+            'student_id': student_id,
+            'game_id': data['game_id'],
+            'round': data['round'],
+            'mission': data['mission'],
+            'action': 'betray',
+            'player_id': data['player_id'],
+            'choice': fail
+            }
+    sio.emit('send_action', resp)
 
 
 @sio.on('test_send')
@@ -25,10 +93,10 @@ def disconnect():
     print('disconnected')
 
 
-def main(username):
-    sio.connect('http://localhost:5000')
+def main():
+    sio.connect(url+'?id='+student_number+'&token='+token)
     # sio.connect('http://localhost:5000',
-    #             headers={'X-Username': username})
+    #             headers={'X-Username': student_number, 'token':security_token})
     sio.wait()
 
 
