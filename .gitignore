@@ -154,4 +154,7 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-*.pyc 
+*.pyc
+
+# flask specific
+ 

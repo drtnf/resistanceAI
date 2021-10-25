@@ -15,6 +15,8 @@ import json
 from app.agent import Agent
 import random
 
+#toggle to false for command line debugging
+socket_on = False
 
 #allows login to get student from database, given id
 #will be stored as current_user?
@@ -208,8 +210,8 @@ class Game(db.Model):
                     'player_number': agent_id,
                     'spy_list': spy_list
                     }
-            #socket.send('new_game', data, self.get_student_id(student))
-            print('new_game', data, self.get_student_id(agent_id))
+            if socket_on: socket.send('new_game', data, self.get_student_id(student))
+            else: print('new_game', data, self.get_student_id(agent_id))
         #initialise rounds and state variables
         self.rounds = []
         #commence rounds
@@ -239,8 +241,8 @@ class Game(db.Model):
                     'spies': self.spies
                     }
             for agent_id in range(self.num_players):
-                #socket.send('game_outcome', data, self.get_student_id(agent_id))
-                print('game_outcome', data, self.get_student_id(agent_id))
+                if socket_on: socket.send('game_outcome', data, self.get_student_id(agent_id))
+                else: print('game_outcome', data, self.get_student_id(agent_id))
             db.session.add(self)# persistance, fill in
             db.session.commit()
         else:
@@ -314,8 +316,8 @@ class Round(db.Model):
                 'missions_failed': len([r for r in self.game.rounds if not r.is_successful()])
                 }
         for student in self.game.students:
-            #socket.send('round_outcome', data, student)
-            print('round_outcome', data, student)
+            if socket_on: socket.send('round_outcome', data, student)
+            else: print('round_outcome', data, student)
         self.game.next_round((self.missions[-1].leader+1)%self.game.num_players)
 
     def is_successful(self):
@@ -375,7 +377,10 @@ class Mission(db.Model):
 
 
     def req_team(self):
-        #socket emit propose team to room leader_id.student number, with token expected for mission x in round y
+        '''
+        socket emit propose team to room leader_id.student number, 
+        with token expected for mission x in round y
+        '''
         self.num_players = self.round.game.num_players
         rnd = self.round.round_num
         self.team_size = Agent.mission_sizes[self.num_players][rnd]
@@ -390,11 +395,16 @@ class Mission(db.Model):
                 'team_size': self.team_size,
                 'betrayals_required': self.fails_required
                 }
-        #socket.request_action('propose_mission', data, student_id, lambda x: self.rec_team(player_id, x))
-        self.rec_team(player_id, input('propose_mission'+'\n'+str(data)+'\n'+str(student_id)+'\n> '))
+        if socket_on: 
+            socket.request_action('propose_mission', data, student_id, lambda x: self.rec_team(player_id, x))
+        else:
+            self.rec_team(player_id, input('propose_mission'+'\n'+str(data)+'\n'+str(student_id)+'\n> '))
 
 
     def rec_team(self, leader_id, team_string=''):
+        '''
+        receive team proposed by leader
+        '''
         self.team_string = self.check_team(team_string)
         if not self.team_string: # if check_team returned False, generate a random team
             self.team_string = self.random_team()
@@ -406,13 +416,13 @@ class Mission(db.Model):
             self.req_betray()
 
 
-    '''
-    checks a valid team is returned,
-    containing the right number of members,
-    where every member is an int from 0 to numplayers-1
-    and no member is repeated
-    '''
     def check_team(self, team):
+        '''
+        checks a valid team is returned,
+        containing the right number of members,
+        where every member is an int from 0 to numplayers-1
+        and no member is repeated
+        '''
         try:
             # remove duplicates, convert to ints, then sort
             team = sorted([int(i) for i in set(team)])
@@ -427,11 +437,11 @@ class Mission(db.Model):
             return "".join([str(i) for i in team])
         return False
 
-    '''
-    Generates a random team string
-    for num_players with given team_size
-    '''
     def random_team(self):
+        '''
+        Generates a random team string
+        for num_players with given team_size
+        '''
         team = []
         while len(team)<self.team_size:
             agent = random.randrange(self.num_players)
@@ -439,17 +449,12 @@ class Mission(db.Model):
                 team.append(agent)
         return "".join([str(i) for i in sorted(team)])
 
-    '''
-    Requests votes from players, one by one
-    Design decision, concurrent requests? Yes
-    '''
     def req_vote(self):
+        '''
+        send a request to each player for a vote on the mission propsoed by the leader,
+        and then wait for responses.
+        '''
         self.votes_required = list(range(self.num_players))
-        '''
-        without sockets, looping over self.votes_required causes bugs (not all
-        players get to vote). when changing back to using sockets, could change
-        loop back to how it was before, if sockets don't have the same bug
-        '''
         for player_id in range(self.num_players):
             student_id = self.round.game.get_student_id(player_id)
             #need map of students to agents?
@@ -461,13 +466,15 @@ class Mission(db.Model):
                     'team': self.team_string,
                     'leader': self.leader
                 }
-            #socket.request_action('vote', data, student_id, lambda x: self.rec_vote(player_id, x))
-            self.rec_vote(player_id, input('vote'+'\n'+str(data)+'\n'+str(student_id)+'\n> '))
+            if socket_on:
+                socket.request_action('vote', data, student_id, lambda x: self.rec_vote(player_id, x))
+            else:
+                self.rec_vote(player_id, input('vote'+'\n'+str(data)+'\n'+str(student_id)+'\n> '))
 
-    '''
-    Code called when votes are received, one by one
-    '''
     def rec_vote(self, player, vote=False):
+        '''
+        Code called when votes are received, one by one
+        '''
         if player in self.votes_required:
             self.vote_string = self.vote_string + (str(player) if vote else '')
             self.votes_required.remove(player)
@@ -479,25 +486,27 @@ class Mission(db.Model):
                     'mission': self.mission_num,
                     'team': self.team_string,
                     'leader': self.leader,
-                    'votes_for': vote_string,
+                    'votes_for': self.vote_string,
                     'approved': self.approved
                     }
-            #socket.send('vote_outcome',data, student_id)
-            print('vote_outcome',data, student_id)
+            for player_id in range(self.num_players):
+                student_id = self.round.game.get_student_id(player_id)
+                if socket_on: socket.send('vote_outcome',data, student_id)
+                else: print('vote_outcome',data, student_id)
             if(self.approved):
                 self.req_betray()
             else:
-                self.round.next_mission((self.leader+1)%self.num_players) # to implement
+                self.round.next_mission((self.leader+1)%self.num_players)
 
-    '''
-    Requests betrayal choice from teams spies
-    '''
     def req_betray(self):
+        '''
+        Requests betrayal choice from teams spies
+        '''
+        #fix from Lauren, rename to make variables meaningful...
         self.team_spies = [int(i) for i in self.team_string if i in self.round.game.spies]
         self.fails = 0
         if not self.team_spies:
             self.success = True
-            #get students....?
             for player_id in range(self.num_players):
                 student_id = self.round.game.get_student_id(player_id)
                 data = {
@@ -508,20 +517,14 @@ class Mission(db.Model):
                         'betrayals': self.fails,
                         'mission_success': self.success
                         }
-                #socket.send('mission_outcome',data, student_id)
-                print('mission_outcome',data, student_id)
+                if socket_on: socket.send('mission_outcome',data, student_id)
+                else: print('mission_outcome',data, student_id)
             self.round.outcome()
         else:
             #build student spy list
-            '''
-            without sockets, looping over self.team_spies causes bugs (not all spies get
-            to betray). when changing back to using sockets, could change
-            loop back to how it was before, if sockets don't have the same bug
-            '''
             spies_list = self.team_spies.copy()
             for player_id in spies_list:
                 student_id = self.round.game.get_student_id(player_id)
-                #socketAgent request betrayal from agent for spy.
                 data = {
                         'game_id': self.round.game.game_id,
                         'round': self.round.round_num,
@@ -529,13 +532,15 @@ class Mission(db.Model):
                         'team': self.team_string,
                         'leader': self.leader
                        }
-                #socket.request_action('betray', data, student_id, lambda x: self.rec_betray(player_id, x))
-                self.rec_betray(player_id, input('betray'+'\n'+str(data)+'\n'+str(student_id)+'\n> '))
+                if socket_on:
+                    socket.request_action('betray', data, student_id, lambda x: self.rec_betray(player_id, x))
+                else:
+                    self.rec_betray(player_id, input('betray'+'\n'+str(data)+'\n'+str(student_id)+'\n> '))
 
-    '''
-    call back used when client returns with betrayal choice
-    '''
     def rec_betray(self, player, betray=False):
+        '''
+        call back used when client returns with betrayal choice
+        '''
         if player in self.team_spies:
             self.team_spies.remove(player)
             if betray: self.fails = self.fails+1
@@ -552,10 +557,9 @@ class Mission(db.Model):
                         'betrayals': self.fails,
                         'mission_success': self.success
                         }
-                #socket.send('mission_outcome',data, student_id)
-                print('mission_outcome', data, student_id)
-            self.round.outcome() # to fill in
-        #else keep waiting...
+                if socket_on: socket.send('mission_outcome',data, student_id)
+                else:print('mission_outcome', data, student_id)
+            self.round.outcome() 
 
 
     '''

@@ -2,13 +2,15 @@ import asyncio
 import sys
 import socketio
 import time
-from random_agent import random_agent as agent
+from random_agent import RandomAgent as Agent
 
 sio = socketio.Client(logger=True, engineio_logger=True)
 
 student_number = "00000000"
 token = "my_security_token"
 url = 'http://localhost:5000'
+
+agent = Agent('itsme')
 
 
 @sio.event
@@ -44,6 +46,7 @@ def propose_mission(data):
     team_string = ('').join([str(c) for c in team])
     resp={
             'student_id': student_id,
+            'token': token,
             'game_id': data['game_id'],
             'round': data['round'],
             'mission': data['mission'],
@@ -59,6 +62,7 @@ def vote(data):
     approve = agent.vote([player for player in data['team']], data['leader'])
     resp={
             'student_id': student_id,
+            'token': token,
             'game_id': data['game_id'],
             'round': data['round'],
             'mission': data['mission'],
@@ -73,6 +77,7 @@ def betray(data):
     fail = agent.vote([player for player in data['team']], data['leader'])
     resp={
             'student_id': student_id,
+            'token': token,
             'game_id': data['game_id'],
             'round': data['round'],
             'mission': data['mission'],
@@ -101,4 +106,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main(sys.argv[1] if len(sys.argv) > 1 else None)
+    main()
+    #main(sys.argv[1] if len(sys.argv) > 1 else None)
