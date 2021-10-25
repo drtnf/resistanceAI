@@ -310,7 +310,7 @@ class Round(db.Model):
         self.success = self.is_successful()
         data = {
                 'game_id': self.game_id,
-                'round_num': len(self.game.rounds),
+                'round_num': self.round_num,
                 'missions_failed': len([r for r in self.game.rounds if not r.is_successful()])
                 }
         for student in self.game.students:
@@ -473,7 +473,17 @@ class Mission(db.Model):
             self.votes_required.remove(player)
         if not self.votes_required: #all votes recieved
             self.approved = len(self.vote_string)>self.num_players/2
-            # TODO: emit vote result to all players
+            data = {
+                    'game_id': self.round.game.game_id,
+                    'round': self.round.round_num,
+                    'mission': self.mission_num,
+                    'team': self.team_string,
+                    'leader': self.leader,
+                    'votes_for': vote_string,
+                    'approved': self.approved
+                    }
+            #socket.send('vote_outcome',data, student_id)
+            print('vote_outcome',data, student_id)
             if(self.approved):
                 self.req_betray()
             else:
@@ -542,7 +552,7 @@ class Mission(db.Model):
                         'betrayals': self.fails,
                         'mission_success': self.success
                         }
-                #socket_agent.send('mission_outcome',data, student_id)
+                #socket.send('mission_outcome',data, student_id)
                 print('mission_outcome', data, student_id)
             self.round.outcome() # to fill in
         #else keep waiting...

@@ -1,10 +1,10 @@
 from flask import Flask, render_template, session, copy_current_request_context
 from flask_socketio import SocketIO, emit, disconnect
 from threading import Timer
-from app import socketio
+from app import app, socketio
 
-app = Flask(__name__)
-socketio = SocketIO(app)
+#app = Flask(__name__)
+#socketio = SocketIO(app)
 #socketio = socketio.Server()
 '''
 dictionary for handling responses to action_requests
@@ -17,22 +17,39 @@ game queue of players waiting to join game
 player_queue = []
 
 
-@app.route('/')#basic landing page
+@app.route('/')#basic landing page with scoreboard
 def index():
     return render_template('index.html')
 
+
+@app.route('/login'):
+    def login():
+        pass
+
+@app.route('/register'):
+    def login():
+        pass
 
 def send(name, data, student_id):
     '''
     name is the name of the function being called
     data is a json data object
     student is the student id to whom the message is being sent
+    names are ['new_game', 'game_outcome', 'round_outcome', 'mission_outcome', 'vote_outcome']
     '''
     with app.app_context():
         emit(name, data, namespace = "/", room=str(student_id))
 
 
 def request_action(action, data, student_id, callback, timeout=5):
+    '''
+    action is the name of the method being called,
+    data is the parameters of the method, nad the context of the request,
+    student_id in the id of the agent recieving the request
+    callback is the method to be executed when the response is received, 
+    timeout is how long the socket will wait for a response.
+    actions are ['propose_mission', 'vote', 'betray']
+    '''
     game_id = data['game_id']
     rnd = data['round']
     mission = data['mission']
@@ -62,12 +79,12 @@ def on_action(data):
     mission = data['mission']
     action = data['action']
     player_id = data['player_id']
-    token = data['token'] # use g.user, and include token-auth in url
+#    token = data['token'] # use g.user, and include token-auth in url
 #    s = Student.get(student_id) #Let token_auth do verification???
 #    game = Game.get(game_id)
 #    if token == s.token and game.get_student_id(player_id)== student_id: # else some thing funny going on.
     if (student_id, game_id, rnd, mission, action) in callbacks:
-        callbacks[(student_id, game_id, rnd, mission, action)](data[choice])
+        callbacks[(student_id, game_id, rnd, mission, action)](data['player_id'], data['choice'])
         callbacks.remove((sudent_id, game_id, rnd, mission, action))
         #else method has timed out. do nothing
 #    else:
