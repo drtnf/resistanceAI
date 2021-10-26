@@ -16,7 +16,7 @@ from app.agent import Agent
 import random
 
 #toggle to false for command line debugging
-socket_on = False
+socket_on = True
 
 #allows login to get student from database, given id
 #will be stored as current_user?
@@ -113,7 +113,7 @@ class Student(UserMixin, db.Model):
                 )
 
     def __str__(self):
-      return self.first_name+' '+self.last_name +' ('+self.agent_name+')'
+      return str(self.first_name)+' '+str(self.last_name) +' ('+str(self.agent_name)+')'
 
 
 ####
@@ -125,8 +125,9 @@ class Plays(db.Model):
     A class for recording a student's agent's role in a game.
     '''
     __tablename__ = 'plays'
-    game_id = db.Column(db.Integer, db.ForeignKey('game.game_id'),primary_key = True)
-    student_id = db.Column(db.Integer, db.ForeignKey('student.id'), primary_key = True)
+    play_id = db.Column(db.Integer, primary_key = True)
+    game_id = db.Column(db.Integer, db.ForeignKey('game.game_id'))
+    student_id = db.Column(db.String(8), db.ForeignKey('student.id'))
     agent_number = db.Column(db.Integer) #0-9, their identifier in the game
     time = db.Column(db.DateTime)
     #references
@@ -188,19 +189,21 @@ class Game(db.Model):
         time = datetime.utcnow()
         self.num_players = len(students)
         for i in range(self.num_players):
-            plays = Plays()
-            plays.agent_number = i
-            plays.game = self
-            plays.student = students[i]
-            plays.time = time
-            db.session.add(plays)
+            play = Plays()
+            play.agent_number = i
+            play.game = self
+            play.student = Student.query.get(students[i])
+            play.time = time
+            db.session.add(play)
         #allocate spies
         self.spies = ''
         while len(self.spies) < Agent.spy_count[self.num_players]:
             spy = str(random.randrange(self.num_players))
             if spy not in self.spies:
                 self.spies = self.spies+str(spy)
-        #start game for each agent        
+        #start game for each agent
+        db.session.add(self)
+        db.session.commit()
         for agent_id in range(self.num_players):
             spy_list = [spy for spy in self.spies if str(agent_id) in self.spies]
             #self.spies_list = [spy for spy in self.spies]
@@ -210,20 +213,20 @@ class Game(db.Model):
                     'player_number': agent_id,
                     'spy_list': spy_list
                     }
-            if socket_on: socket.send('new_game', data, self.get_student_id(student))
+            if socket_on: socket.send('new_game', data, self.get_student_id(agent_id))
             else: print('new_game', data, self.get_student_id(agent_id))
         #initialise rounds and state variables
         self.rounds = []
         #commence rounds
         leader = 0
-        db.session.commit()
         self.next_round(leader)
 
     def get_student_id(self, player_id):
         '''
         maps a players id to the corresponding student_id
         '''
-        return [p.student_id for p in self.plays if p.agent_number == player_id][0]
+        play = Plays.query.filter_by(game_id=self.game_id).filter_by(agent_number=player_id).first()
+        return str(play.student_id)
 
 #not required?
 #    def student_to_index(self, student):
@@ -315,9 +318,9 @@ class Round(db.Model):
                 'round_num': self.round_num,
                 'missions_failed': len([r for r in self.game.rounds if not r.is_successful()])
                 }
-        for student in [p.student for p in self.game.plays]:
-            if socket_on: socket.send('round_outcome', data, student)
-            else: print('round_outcome', data, student)
+        for student_id in [p.student.id for p in self.game.plays]:
+            if socket_on: socket.send('round_outcome', data, student_id)
+            else: print('round_outcome', data, student_id)
         self.game.next_round((self.missions[-1].leader+1)%self.game.num_players)
 
     def is_successful(self):
@@ -342,8 +345,8 @@ class Round(db.Model):
             self.missions = [m.from_dict[mission] for mission in data['missions']]
 
     def __str__(self):
-        desc = '\nRound id: ' + self.round_id + \
-                '\n Round ' + self.round_num + ' of game ' + self.game_id + \
+        desc = '\nRound id: ' + str(self.round_id) + \
+                '\n Round ' + str(self.round_num) + ' of game ' + str(self.game_id) + \
                 '\n Resistance wins!' if self.success else '\n Spies win!' + \
                 '\n Missions: '
         for m in self.missions:
@@ -383,8 +386,8 @@ class Mission(db.Model):
         '''
         self.num_players = self.round.game.num_players
         rnd = self.round.round_num
-        self.team_size = Agent.mission_sizes[self.num_players][rnd]
-        self.fails_required = Agent.fails_required[self.num_players][rnd]
+        self.team_size = Agent.mission_sizes[self.round.game.num_players][rnd]
+        self.fails_required = Agent.fails_required[self.round.game.num_players][rnd]
         student_id = self.round.game.get_student_id(self.leader)
         player_id  = self.leader
         data = {
@@ -423,19 +426,22 @@ class Mission(db.Model):
         where every member is an int from 0 to numplayers-1
         and no member is repeated
         '''
-        try:
-            # remove duplicates, convert to ints, then sort
-            team = sorted([int(i) for i in set(team)])
-        except ValueError:
-            # converting to int did not work, so there were some non-digit chars in team string
-            return False
-        if len(team) != self.team_size:
-            return False
-        # assuming that team is already in sorted order
-        if 0 <= team[0] and team[-1] < self.num_players:
+        if team:
+            try:
+                # remove duplicates, convert to ints, then sort
+                team = sorted([int(i) for i in set(team)])
+            except ValueError:
+                # converting to int did not work, so there were some non-digit chars in team string
+                return False
+            if len(team) != self.team_size:
+                return False
+            # assuming that team is already in sorted order
+            if 0 <= team[0] and team[-1] < self.round.game.num_players:
             # convert back to string
-            return "".join([str(i) for i in team])
-        return False
+                return "".join([str(i) for i in team])
+            return False
+        else:
+            return False
 
     def random_team(self):
         '''
@@ -444,7 +450,7 @@ class Mission(db.Model):
         '''
         team = []
         while len(team)<self.team_size:
-            agent = random.randrange(self.num_players)
+            agent = random.randrange(self.round.game.num_players)
             if agent not in team:
                 team.append(agent)
         return "".join([str(i) for i in sorted(team)])
@@ -454,8 +460,8 @@ class Mission(db.Model):
         send a request to each player for a vote on the mission propsoed by the leader,
         and then wait for responses.
         '''
-        self.votes_required = list(range(self.num_players))
-        for player_id in range(self.num_players):
+        self.votes_required = list(range(self.round.game.num_players))
+        for player_id in range(self.round.game.num_players):
             student_id = self.round.game.get_student_id(player_id)
             data = {
                     'game_id': self.round.game.game_id,
@@ -466,6 +472,7 @@ class Mission(db.Model):
                     'leader': self.leader
                 }
             if socket_on:
+                print(str(student_id),':',str(player_id))
                 socket.request_action('vote', data, student_id, lambda x: self.rec_vote(player_id, x))
             else:
                 self.rec_vote(player_id, input('vote'+'\n'+str(data)+'\n'+str(student_id)+'\n> '))
@@ -474,7 +481,9 @@ class Mission(db.Model):
         '''
         Code called when votes are received, one by one
         '''
+        print(self.votes_required)
         if player in self.votes_required:
+            print('player '+ str(player)+' voting')
             self.vote_string = self.vote_string + (str(player) if vote else '')
             self.votes_required.remove(player)
         if not self.votes_required: #all votes recieved
@@ -592,15 +601,15 @@ class Mission(db.Model):
                setattr(self, attr, data[attr])
 
     def __str__(self):
-        return 'Mission: '+self.mission_id + \
-                ' in round: ' +self.round_id + \
-                '\nLeader ' + self.leader + \
-                'proposed team ' +self.team_string + \
-                '\nThe votes for were ' + self.vote_string + \
+        return 'Mission: '+ str(self.mission_id) + \
+                ' in round: ' + str(self.round_id) + \
+                '\nLeader ' + str(self.leader) + \
+                'proposed team ' + str(self.team_string) + \
+                '\nThe votes for were ' + str(self.vote_string) + \
                 'and the mission was ' + \
                     ('not approved' if not self.approved else \
-                    'approved\nThere were ' + len(self.fails) + 'failures and the mission ' + \
-                    ('succeeded' if self.success else 'failed')
+                    'approved\nThere were ' + str(len(self.fails)) + 'failures and the mission ' + \
+                    ('succeeded.' if self.success else 'failed.')
                     )
 
 
