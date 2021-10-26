@@ -1,5 +1,5 @@
 from flask import Flask, render_template, session, copy_current_request_context
-from flask_socketio import SocketIO, emit, disconnect
+from flask_socketio import SocketIO, emit, disconnect, join_room, leave_room
 from threading import Timer
 from app import app, socketio
 from functools import wraps
@@ -68,6 +68,7 @@ def request_action(action, data, student_id, callback, timeout=5):
     timeout is how long the socket will wait for a response.
     actions are ['propose_mission', 'vote', 'betray']
     '''
+    global callbacks
     game_id = data['game_id']
     rnd = data['round']
     mission = data['mission']
@@ -81,6 +82,7 @@ def request_action(action, data, student_id, callback, timeout=5):
     t.start()
 
 def default_action(student_id, game_id, rnd, mission, action):
+    global callbacks
     if (student_id, game_id, rnd, mission, action) in callbacks:
         callbacks[(student_id, game_id, rnd, mission, action)]()
         callbacks.remove((student_id, game_id, rnd, mission, action))
@@ -92,6 +94,7 @@ def default_action(student_id, game_id, rnd, mission, action):
 @socketio.on('send_action')
 @token_required
 def on_action(data):
+    global callbacks
     student_id = data['student_id']
     game_id = data['game_id']
     rnd = data['round']
@@ -107,27 +110,31 @@ def on_action(data):
 #####
 
 @socketio.on('connect')
-def connect():
+def connect(auth):
     '''
     On connection request:
     check authentication
     add to queue
     acknowledge connection
     '''
+    global player_queue
+    from app.models import Student
     with app.app_context():#check token here?
-        student_id = g['user']#check if this is best way???
-        token = g['token']
-        if Student.check_token(token).id == student_id:
+        token = auth['token']
+        print(token)
+        student_id=Student.check_token(token).id
+        print(student_id)
+        if student_id:
             join_room(str(student_id))
             if student_id not in player_queue:
                 player_queue.append(student_id)
-                send(student_id + ' has been added to game queue.', namespace = "/", to=str(student_id))
-                t = threading.timer(5, start_game)
+                send('connect', {'msg': str(student_id) + ' has been added to game queue.'}, student_id)
+                t = Timer(5, start_game)
                 t.start()
             else:
-                send(student_id + ' already in game queue.', namespace = "/", to=str(student_id))
+                send('connect', {'msg': str(student_id) + ' already in game queue.'}, student_id)
         else:  
-            send('Invalid token', namespace = "/", to=str(student_id))
+            send('connect', {msg: 'Invalid token'}, student_id)
 
 
 def start_game():        
@@ -140,12 +147,13 @@ def start_game():
        create new Game.
        call game.start(players)
     '''
+    global player_queue
     num_waiting = len(player_queue)
     if num_waiting>=5:
         g = app.models.Game() 
         player_num = random.randrange(5, min(10, num_waiting))
-        agents = player_queue[:player_num]#just grab front agents...?
-        player_queue = player_queue[player_num:]
+        agents = socket.player_queue[:player_num]#just grab front agents...?
+        socket.player_queue = socket.player_queue[player_num:]
         g.start(agents)
     #else do nothing.
 

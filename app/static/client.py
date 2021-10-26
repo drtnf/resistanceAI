@@ -6,8 +6,8 @@ from random_agent import RandomAgent as Agent
 
 sio = socketio.Client(logger=True, engineio_logger=True)
 
-student_number = "00000000"
-token = "my_security_token"
+student_number = "19617810"
+token = "O/c1PP0kemgx/oUvUVVtq1djvBWlJuLv"
 url = 'http://localhost:5000'
 
 agent = Agent('itsme')
@@ -99,7 +99,7 @@ def disconnect():
 
 
 def main():
-    sio.connect(url+'?id='+student_number+'&token='+token)
+    sio.connect(url, transports='polling', auth={'token':token})
     # sio.connect('http://localhost:5000',
     #             headers={'X-Username': student_number, 'token':security_token})
     sio.wait()

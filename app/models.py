@@ -39,7 +39,7 @@ class Student(UserMixin, db.Model):
     token = db.Column(db.String(32), index=True, unique = True)
     token_expiration=db.Column(db.DateTime)
     #non-database fields
-    games = db.relationship('Game', secondary='plays') 
+    #games = db.relationship('Game', secondary='plays') 
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -171,7 +171,7 @@ class Game(db.Model):
     spies = db.Column(db.String(5)) #only populated at the end.
     #backrefs for rounds and missions
     rounds = db.relationship('Round', backref='game',lazy=False)
-    students = db.relationship('Student', secondary='plays')
+    #students = db.relationship('Student', secondary='plays')
 
     def start(self, students):
         '''
@@ -315,7 +315,7 @@ class Round(db.Model):
                 'round_num': self.round_num,
                 'missions_failed': len([r for r in self.game.rounds if not r.is_successful()])
                 }
-        for student in self.game.students:
+        for student in [p.student for p in self.game.plays]:
             if socket_on: socket.send('round_outcome', data, student)
             else: print('round_outcome', data, student)
         self.game.next_round((self.missions[-1].leader+1)%self.game.num_players)
@@ -457,7 +457,6 @@ class Mission(db.Model):
         self.votes_required = list(range(self.num_players))
         for player_id in range(self.num_players):
             student_id = self.round.game.get_student_id(player_id)
-            #need map of students to agents?
             data = {
                     'game_id': self.round.game.game_id,
                     'round': self.round.round_num,
