@@ -17,6 +17,11 @@ game queue of players waiting to join game
 '''
 player_queue = []
 
+'''
+token for access to the game_queue
+'''
+queue_token = True
+
 
 def token_required(f):
     '''
@@ -83,12 +88,12 @@ def request_action(action, data, student_id, callback, timeout=5):
     t = Timer(timeout, default_action, args=[student_id, game_id, rnd, mission, action])
     t.start()
 
-def default_action(student_id, game_id, rnd, mission, action):
+def default_action(student_id, game_id, rnd, mission, action):#add student_id to a list, and prevent them re-entering the game queue??
     global callbacks
     if (student_id, game_id, rnd, mission, action) in callbacks:
         #print('TIMEOUT')
-        callbacks[(student_id, game_id, rnd, mission, action)](False)
-        callbacks.pop((student_id, game_id, rnd, mission, action))
+        f = callbacks.pop((student_id, game_id, rnd, mission, action))
+        f(False)
 
         with app.app_context():
             emit('timeout', {'game_id': game_id, 'round': rnd, 'mission': mission, 'action': action}, namespace = "/", room=str(student_id)) 
@@ -134,11 +139,11 @@ def join_player_queue(student):
     print(student.id)
     if student.id not in player_queue:
         player_queue.append(student.id)
-        send('connect_attempt', {'msg': str(student.id) + ' has been added to game queue.'}, student.id)
+        send('join_queue', {'msg': str(student.id) + ' has been added to game queue.'}, student.id)
         t = Timer(5, start_game)
         t.start()
     else:
-        send('connect_attempt', {'msg': str(student.id) + ' already in game queue.'}, student.id)
+        send('join_queue', {'msg': str(student.id) + ' already in game queue.'}, student.id)
 
 
 def start_game():        
@@ -152,7 +157,9 @@ def start_game():
        call game.start(players)
     '''
     from app.models import Game
-    global player_queue
+    global player_queue, queue_token
+    if not queue_token: return
+    queue_token = False
     num_waiting = len(player_queue)
     if num_waiting>=5:
         g = Game() 
@@ -163,6 +170,7 @@ def start_game():
         #agents = player_queue[:player_num]#just grab front agents...?
         #player_queue = player_queue[player_num:]
         g.start(agents)
+    queue_token = True    
     #else do nothing.
 
 
