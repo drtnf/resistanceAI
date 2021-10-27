@@ -71,23 +71,21 @@ def request_action(action, data, student_id, callback, timeout=5):
     actions are ['propose_mission', 'vote', 'betray']
     '''
     global callbacks
-    print('ACTION REQUESTED', data)
+    #print('ACTION REQUESTED', data, 'ACTION:', action, 'STUDENT:', student_id)
     game_id = data['game_id']
     rnd = data['round']
     mission = data['mission']
     player_id = data['player_id']
     callbacks[(student_id, game_id, rnd, mission, action)] = callback
-
     with app.app_context():
         emit(action, data, namespace = "/", room=str(student_id))
-
     t = Timer(timeout, default_action, args=[student_id, game_id, rnd, mission, action])
     t.start()
 
 def default_action(student_id, game_id, rnd, mission, action):
     global callbacks
     if (student_id, game_id, rnd, mission, action) in callbacks:
-        print('TIMEOUT')
+        #print('TIMEOUT')
         callbacks[(student_id, game_id, rnd, mission, action)](False)
         callbacks.pop((student_id, game_id, rnd, mission, action))
 
@@ -99,7 +97,7 @@ def default_action(student_id, game_id, rnd, mission, action):
 @token_required
 def on_action(data):
     global callbacks
-    print('ACTION RECIEVED', data)
+    #print('ACTION RECIEVED', data)
     student_id = data['student_id']
     game_id = data['game_id']
     rnd = data['round']
@@ -107,13 +105,9 @@ def on_action(data):
     action = data['action']
     player_id = data['player_id']
     if (student_id, game_id, rnd, mission, action) in callbacks:
-        print('ACTION EXECUTED', data)
-        callbacks[(student_id, game_id, rnd, mission, action)](data['choice'])
-        callbacks.pop((student_id, game_id, rnd, mission, action))
+        f = callbacks.pop((student_id, game_id, rnd, mission, action))
+        f(player_id, data['choice'])
 
-#####
-#need code here for handling connect events.
-#####
 
 @socketio.on('connect')
 def connect(auth):
@@ -130,17 +124,20 @@ def connect(auth):
         print(token)
         student=Student.check_token(token)
         if student:
-            print(student.id)
-            join_room(str(student.id))
-            if student.id not in player_queue:
-                player_queue.append(student.id)
-                send('connect', {'msg': str(student.id) + ' has been added to game queue.'}, student.id)
-                t = Timer(5, start_game)
-                t.start()
-            else:
-                send('connect', {'msg': str(student.id) + ' already in game queue.'}, student.id)
+            join_player_queue(student)
         else:  
             send('connect', {'msg': 'Invalid token'}, student.id)
+
+def join_player_queue(student):
+    print(student.id)
+    join_room(str(student.id))
+    if student.id not in player_queue:
+        player_queue.append(student.id)
+        send('connect', {'msg': str(student.id) + ' has been added to game queue.'}, student.id)
+        t = Timer(5, start_game)
+        t.start()
+    else:
+        send('connect', {'msg': str(student.id) + ' already in game queue.'}, student.id)
 
 
 def start_game():        

@@ -56,6 +56,7 @@ class Student(UserMixin, db.Model):
         self.token = base64.b64encode(os.urandom(24)).decode('utf-8')
         self.token_expiration = now+timedelta(seconds=expires_in)
         db.session.add(self)
+        db.session.commit()
         return self.token
 
     def revoke_token(self):
@@ -195,6 +196,7 @@ class Game(db.Model):
             play.student = Student.query.get(students[i])
             play.time = time
             db.session.add(play)
+            db.session.commit()
         #allocate spies
         self.spies = ''
         while len(self.spies) < Agent.spy_count[self.num_players]:
@@ -248,9 +250,13 @@ class Game(db.Model):
                 else: print('game_outcome', data, self.get_student_id(agent_id))
             db.session.add(self)# persistance, fill in
             db.session.commit()
+            for student in [p.student for p in self.plays]:
+                socket.join_player_queue(student)
         else:
-            rnd = Round(game_id=self.game_id, round_num=len(self.rounds))
+            rnd = Round(round_num=len(self.rounds))
+            rnd.game = self
             db.session.add(rnd)
+            db.session.commit()
             self.rounds.append(rnd)
             self.rounds[-1].next_mission(leader)
 
@@ -308,6 +314,7 @@ class Round(db.Model):
             self.missions = []
         mission = Mission(round_id = self.round_id, leader=leader, mission_num=len(self.missions))
         db.session.add(mission)
+        db.session.commit()
         self.missions.append(mission)
         self.missions[-1].req_team()
 
@@ -399,7 +406,8 @@ class Mission(db.Model):
                 'betrayals_required': self.fails_required
                 }
         if socket_on: 
-            socket.request_action('propose_mission', data, student_id, lambda x: self.rec_team(player_id, x))
+            #socket.request_action('propose_mission', data, student_id, lambda x: self.rec_team(player_id, x)) #stops students faking??
+            socket.request_action('propose_mission', data, student_id, self.rec_team)
         else:
             self.rec_team(player_id, input('propose_mission'+'\n'+str(data)+'\n'+str(student_id)+'\n> '))
 
@@ -472,8 +480,8 @@ class Mission(db.Model):
                     'leader': self.leader
                 }
             if socket_on:
-                print(str(student_id),':',str(player_id))
-                socket.request_action('vote', data, student_id, lambda x: self.rec_vote(player_id, x))
+                #socket.request_action('vote', data, student_id, lambda x: self.rec_vote(player_id, x)) #stops faking others actions?
+                socket.request_action('vote', data, student_id, self.rec_vote)
             else:
                 self.rec_vote(player_id, input('vote'+'\n'+str(data)+'\n'+str(student_id)+'\n> '))
 
@@ -481,9 +489,7 @@ class Mission(db.Model):
         '''
         Code called when votes are received, one by one
         '''
-        print(self.votes_required)
         if player in self.votes_required:
-            print('player '+ str(player)+' voting')
             self.vote_string = self.vote_string + (str(player) if vote else '')
             self.votes_required.remove(player)
         if not self.votes_required: #all votes recieved
@@ -513,7 +519,7 @@ class Mission(db.Model):
         #fix from Lauren, rename to make variables meaningful...
         self.team_spies = [int(i) for i in self.team_string if i in self.round.game.spies]
         self.fails = 0
-        if not self.team_spies:
+        if not self.team_spies:#no spies on mission. automatic success
             self.success = True
             for player_id in range(self.num_players):
                 student_id = self.round.game.get_student_id(player_id)
@@ -521,6 +527,7 @@ class Mission(db.Model):
                         'game_id': self.round.game.game_id,
                         'round': self.round.round_num,
                         'mission': self.mission_num,
+                        'team': self.team_string,
                         'proposer': self.leader,
                         'betrayals': self.fails,
                         'mission_success': self.success
@@ -538,10 +545,12 @@ class Mission(db.Model):
                         'round': self.round.round_num,
                         'mission': self.mission_num,
                         'team': self.team_string,
-                        'leader': self.leader
+                        'leader': self.leader,
+                        'player_id': player_id
                        }
                 if socket_on:
-                    socket.request_action('betray', data, student_id, lambda x: self.rec_betray(player_id, x))
+                    #socket.request_action('betray', data, student_id, lambda x: self.rec_betray(player_id, x)) # stops students faking???
+                    socket.request_action('betray', data, student_id, self.rec_betray)
                 else:
                     self.rec_betray(player_id, input('betray'+'\n'+str(data)+'\n'+str(student_id)+'\n> '))
 

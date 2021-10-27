@@ -6,8 +6,7 @@ from random_agent import RandomAgent as Agent
 
 sio = socketio.Client(logger=True, engineio_logger=True)
 
-student_number = "19617810"
-token = "O/c1PP0kemgx/oUvUVVtq1djvBWlJuLv"
+token = "WaJ+qxospa33j01+nlLutMKjLkaYVkSh"
 url = 'http://localhost:5000'
 
 agent = Agent('itsme')
