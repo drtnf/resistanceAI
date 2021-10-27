@@ -158,8 +158,10 @@ def start_game():
         g = Game() 
         print('NEW GAME:', g.game_id) 
         player_num = random.randrange(5, min(11, num_waiting+1))
-        agents = player_queue[:player_num]#just grab front agents...?
-        player_queue = player_queue[player_num:]
+        agents = []
+        for i in range(player_num): agents.append(player_queue.pop(0))
+        #agents = player_queue[:player_num]#just grab front agents...?
+        #player_queue = player_queue[player_num:]
         g.start(agents)
     #else do nothing.
 
