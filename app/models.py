@@ -228,6 +228,7 @@ class Game(db.Model):
         maps a players id to the corresponding student_id
         '''
         play = Plays.query.filter_by(game_id=self.game_id).filter_by(agent_number=player_id).first()
+        print('Player ', play.agent_number,' is played by Student ', play.student_id,' in Game ', play.game_id)
         return str(play.student_id)
 
 #not required?

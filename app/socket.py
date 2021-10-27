@@ -39,7 +39,7 @@ def token_required(f):
 
 @app.route('/')#basic landing page with scoreboard
 def index():
-    return render_template('index.html')
+    return app.send_static_file('index.html')
 
 
 @app.route('/login')
@@ -57,6 +57,7 @@ def send(name, data, student_id):
     student is the student id to whom the message is being sent
     names are ['new_game', 'game_outcome', 'round_outcome', 'mission_outcome', 'vote_outcome']
     '''
+    print('DATA SENT', data, 'STUDENT:', student_id)
     with app.app_context():
         emit(name, data, namespace = "/", room=str(student_id))
 
@@ -71,7 +72,7 @@ def request_action(action, data, student_id, callback, timeout=5):
     actions are ['propose_mission', 'vote', 'betray']
     '''
     global callbacks
-    #print('ACTION REQUESTED', data, 'ACTION:', action, 'STUDENT:', student_id)
+    print('ACTION REQUESTED', data, 'ACTION:', action, 'STUDENT:', student_id)
     game_id = data['game_id']
     rnd = data['round']
     mission = data['mission']
@@ -97,7 +98,7 @@ def default_action(student_id, game_id, rnd, mission, action):
 @token_required
 def on_action(data):
     global callbacks
-    #print('ACTION RECIEVED', data)
+    print('ACTION RECIEVED', data)
     student_id = data['student_id']
     game_id = data['game_id']
     rnd = data['round']
@@ -123,21 +124,21 @@ def connect(auth):
         token = auth['token']
         print(token)
         student=Student.check_token(token)
+        join_room(str(student.id))
         if student:
             join_player_queue(student)
         else:  
-            send('connect', {'msg': 'Invalid token'}, student.id)
+            send('connect_attempt', {'msg': 'Invalid token'}, student.id)
 
 def join_player_queue(student):
     print(student.id)
-    join_room(str(student.id))
     if student.id not in player_queue:
         player_queue.append(student.id)
-        send('connect', {'msg': str(student.id) + ' has been added to game queue.'}, student.id)
+        send('connect_attempt', {'msg': str(student.id) + ' has been added to game queue.'}, student.id)
         t = Timer(5, start_game)
         t.start()
     else:
-        send('connect', {'msg': str(student.id) + ' already in game queue.'}, student.id)
+        send('connect_attempt', {'msg': str(student.id) + ' already in game queue.'}, student.id)
 
 
 def start_game():        
@@ -155,6 +156,7 @@ def start_game():
     num_waiting = len(player_queue)
     if num_waiting>=5:
         g = Game() 
+        print('NEW GAME:', g.game_id) 
         player_num = random.randrange(5, min(11, num_waiting+1))
         agents = player_queue[:player_num]#just grab front agents...?
         player_queue = player_queue[player_num:]
