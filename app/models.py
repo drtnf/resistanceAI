@@ -258,7 +258,6 @@ class Game(db.Model):
             rnd.game = self
             db.session.add(rnd)
             db.session.commit()
-            self.rounds.append(rnd)
             self.rounds[-1].next_mission(leader)
 
 
@@ -316,7 +315,6 @@ class Round(db.Model):
         mission = Mission(round_id = self.round_id, leader=leader, mission_num=len(self.missions))
         db.session.add(mission)
         db.session.commit()
-        self.missions.append(mission)
         self.missions[-1].req_team()
 
     def outcome(self):
@@ -383,7 +381,7 @@ class Mission(db.Model):
     team_string = db.Column(db.String(5))
     vote_string = db.Column(db.String(10))
     approved = db.Column(db.Boolean)
-    fails = db.Column(db.String(4))
+    fails = db.Column(db.Integer)
     success = db.Column(db.Boolean)
 
 
@@ -420,11 +418,26 @@ class Mission(db.Model):
         self.team_string = self.check_team(team_string)
         if not self.team_string: # if check_team returned False, generate a random team
             self.team_string = self.random_team()
-        self.vote_string = ''
+
         if self.mission_num<4:
+            self.vote_string = ''
             self.req_vote()
         else:
+            self.vote_string = ''.join([str(player) for player in range(self.round.game.num_players)])
             self.approved = True
+            data = {
+                    'game_id': self.round.game.game_id,
+                    'round': self.round.round_num,
+                    'mission': self.mission_num,
+                    'team': self.team_string,
+                    'leader': self.leader,
+                    'votes_for': self.vote_string,
+                    'approved': self.approved
+                    }
+            for player_id in range(self.num_players):
+                student_id = self.round.game.get_student_id(player_id)
+                if socket_on: socket.send('vote_outcome', data, student_id)
+                else: print('vote_outcome', data, student_id)
             self.req_betray()
 
 

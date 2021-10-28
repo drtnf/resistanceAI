@@ -65,7 +65,7 @@ To test this you need to follow the high-level steps.
 2. Build a database, using `flask db init`, `migrate`, `upgrade`, etc
 3. Add students into the database. Each student needs an id (8 digit string), and a token generated.
 4. Update the file client.py in app/static to include the credentials of the given student
-5. do `run flask` for the server code.
+5. do `flask run` for the server code.
 6. do `python3 client.py` for the client code. They should then start talking to each other. 
 7. If you have five clients or more connected at once, they should start playing games.   
 
