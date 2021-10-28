@@ -157,4 +157,10 @@ cython_debug/
 *.pyc
 
 # flask specific
- 
+
+# generated client folders
+clients/agent*
+
+# generated student details
+student_deets.txt
+
